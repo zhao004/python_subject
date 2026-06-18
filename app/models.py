@@ -6,7 +6,7 @@ from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-from app.time_utils import app_now
+from app.time_utils import storage_now
 
 
 class ScoreRecord(Base):
@@ -27,5 +27,5 @@ class ScoreRecord(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     elapsed_seconds: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     matched_pair_ids: Mapped[str] = mapped_column(Text, nullable=False)
-    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=app_now)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=app_now)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=storage_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=storage_now)

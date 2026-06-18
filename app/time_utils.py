@@ -4,23 +4,24 @@ from datetime import datetime, timedelta, timezone
 
 APP_TIMEZONE_OFFSET_HOURS = 8
 APP_TIMEZONE = timezone(timedelta(hours=APP_TIMEZONE_OFFSET_HOURS), "UTC+8")
+STORAGE_TIMEZONE = timezone.utc
 
 
-def app_now() -> datetime:
-    """生成应用统一使用的 UTC+8 当前时间。
+def storage_now() -> datetime:
+    """生成数据库统一存储的 UTC 当前时间。
 
     Returns:
-        带 UTC+8 时区信息的当前时间。
+        带 UTC 时区信息的当前时间。
     """
 
-    return datetime.now(APP_TIMEZONE)
+    return datetime.now(STORAGE_TIMEZONE)
 
 
-def normalize_to_app_timezone(value: datetime | str) -> datetime:
+def convert_storage_time_to_app_timezone(value: datetime | str) -> datetime:
     """将数据库时间统一转换为 UTC+8。
 
     Args:
-        value: 数据库模型中的时间字段，可能是 datetime 或 ISO 字符串。
+        value: 数据库模型中的时间字段，可能是 datetime 或 ISO 字符串；无时区值按 UTC 存储值处理。
 
     Returns:
         带 UTC+8 时区信息的时间。
@@ -38,5 +39,5 @@ def normalize_to_app_timezone(value: datetime | str) -> datetime:
         raise TypeError("时间字段必须是 datetime 或 ISO 字符串")
 
     if parsed_datetime.tzinfo is None or parsed_datetime.utcoffset() is None:
-        return parsed_datetime.replace(tzinfo=APP_TIMEZONE)
+        parsed_datetime = parsed_datetime.replace(tzinfo=STORAGE_TIMEZONE)
     return parsed_datetime.astimezone(APP_TIMEZONE)

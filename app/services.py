@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.config import POINTS_PER_PAIR, TOTAL_PAIRS
 from app.models import ScoreRecord
 from app.schemas import LeaderboardEntry, ScoreRecordResponse, ScoreSubmission
-from app.time_utils import app_now, normalize_to_app_timezone
+from app.time_utils import convert_storage_time_to_app_timezone, storage_now
 
 
 def calculate_score(matched_pair_ids: list[int]) -> tuple[int, int]:
@@ -67,7 +67,7 @@ def upsert_best_score(session: Session, submission: ScoreSubmission) -> tuple[Sc
     """
 
     correct_count, score = calculate_score(submission.matched_pair_ids)
-    now = app_now()
+    now = storage_now()
     existing = session.scalar(
         select(ScoreRecord).where(
             ScoreRecord.student_class == submission.student_class,
@@ -111,10 +111,10 @@ def upsert_best_score(session: Session, submission: ScoreSubmission) -> tuple[Sc
 def build_score_response(record: ScoreRecord) -> ScoreRecordResponse:
     """将数据库模型转换成 API 响应模型。
 
-    数据库驱动可能丢失 DateTime 的时区信息；这里按应用时区补齐，保证接口输出稳定。
+    数据库驱动可能丢失 DateTime 的时区信息；这里按 UTC 存储口径转换为应用时区。
     """
 
-    submitted_at = normalize_to_app_timezone(record.submitted_at)
+    submitted_at = convert_storage_time_to_app_timezone(record.submitted_at)
     return ScoreRecordResponse(
         id=record.id,
         student_class=record.student_class,
