@@ -1,0 +1,29 @@
+# Test FastAPI endpoints
+
+GET http://127.0.0.1:8000/
+Accept: application/json
+
+###
+
+GET http://127.0.0.1:8000/api/quiz
+Accept: application/json
+
+###
+
+POST http://127.0.0.1:8000/api/scores
+Content-Type: application/json
+
+{
+  "student_class": "一班",
+  "student_id": "001",
+  "student_name": "张三",
+  "elapsed_seconds": 75,
+  "matched_pair_ids": [0, 1, 2, 3]
+}
+
+###
+
+GET http://127.0.0.1:8000/api/leaderboard?limit=10
+Accept: application/json
+
+###
