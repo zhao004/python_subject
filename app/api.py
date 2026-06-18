@@ -34,13 +34,16 @@ def submit_score(submission: ScoreSubmission, session: SessionDep) -> ScoreSubmi
 
     try:
         record, saved_as_best = upsert_best_score(session, submission)
+        response_record = build_score_response(record)
     except SQLAlchemyError as exc:
         session.rollback()
         raise HTTPException(status_code=500, detail="成绩保存失败，请稍后重试") from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail="成绩数据异常，请联系管理员") from exc
 
     return ScoreSubmissionResponse(
         saved_as_best=saved_as_best,
-        record=build_score_response(record),
+        record=response_record,
     )
 
 
@@ -58,4 +61,6 @@ def read_leaderboard(
         entries = list_leaderboard(session, limit)
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="排行榜读取失败，请稍后重试") from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail="排行榜数据异常，请联系管理员") from exc
     return LeaderboardResponse(entries=entries)

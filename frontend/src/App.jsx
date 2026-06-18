@@ -8,6 +8,7 @@ const LEADERBOARD_LIMIT = 50;
 const ONE_SECOND_MS = 1000;
 const TOAST_LIFETIME_MS = 3000;
 const STUDENT_PROFILE_STORAGE_KEY = 'wordMatchStudentProfile:v1';
+const APP_TIME_ZONE = 'Asia/Shanghai';
 const STUDENT_ID_LENGTH = 9;
 const STUDENT_ID_PATTERN = /^\d{9}$/;
 const FIELD_LIMITS = {
@@ -61,7 +62,7 @@ function formatElapsedTime(totalSeconds) {
 }
 
 /**
- * 将服务端提交时间格式化为本地可读时间。
+ * 将服务端提交时间按应用时区格式化为可读时间。
  *
  * @param {string} submittedAt 服务端返回的 ISO 时间。
  * @returns {string} 本地时间文本。
@@ -72,6 +73,7 @@ function formatSubmittedTime(submittedAt) {
         return '时间未知';
     }
     return submittedDate.toLocaleString('zh-CN', {
+        timeZone: APP_TIME_ZONE,
         year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     });
 }

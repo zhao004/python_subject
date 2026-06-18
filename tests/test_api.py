@@ -1,6 +1,7 @@
 """API 行为测试。"""
 
 from collections.abc import Iterator
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,13 @@ def build_payload(
         "elapsed_seconds": elapsed_seconds,
         "matched_pair_ids": matched_pair_ids if matched_pair_ids is not None else [0, 1, 2],
     }
+
+
+def assert_utc8_datetime(value: str) -> None:
+    """断言接口返回时间携带 UTC+8 偏移量，避免前端按无时区时间误解析。"""
+
+    parsed_datetime = datetime.fromisoformat(value)
+    assert parsed_datetime.utcoffset() == timedelta(hours=8)
 
 
 def test_static_javascript_uses_module_mime_type(tmp_path: Path) -> None:
@@ -78,6 +86,15 @@ def test_submit_partial_score(client: TestClient) -> None:
     assert body["record"]["correct_count"] == 4
     assert body["record"]["score"] == 20
     assert body["record"]["elapsed_seconds"] == 60
+
+
+def test_submit_score_returns_utc8_submitted_time(client: TestClient) -> None:
+    """成绩提交响应时间必须携带 UTC+8 偏移量。"""
+
+    response = client.post("/api/scores", json=build_payload(matched_pair_ids=[0, 1, 2]))
+
+    assert response.status_code == 201
+    assert_utc8_datetime(response.json()["record"]["submitted_at"])
 
 
 def test_better_score_overwrites_existing_best(client: TestClient) -> None:
@@ -144,6 +161,17 @@ def test_leaderboard_orders_by_score_then_elapsed_time(client: TestClient) -> No
     entries = response.json()["entries"]
     assert [entry["student_id"] for entry in entries] == ["000000003", "000000002", "000000001"]
     assert [entry["rank"] for entry in entries] == [1, 2, 3]
+
+
+def test_leaderboard_returns_utc8_submitted_time(client: TestClient) -> None:
+    """排行榜提交时间必须携带 UTC+8 偏移量。"""
+
+    client.post("/api/scores", json=build_payload(matched_pair_ids=[0, 1, 2]))
+
+    response = client.get("/api/leaderboard?limit=1")
+
+    assert response.status_code == 200
+    assert_utc8_datetime(response.json()["entries"][0]["submitted_at"])
 
 
 @pytest.mark.parametrize(

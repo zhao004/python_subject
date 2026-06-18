@@ -1,17 +1,12 @@
 """数据库模型。"""
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-
-
-def utc_now() -> datetime:
-    """生成 UTC 时间，统一服务端提交时间口径。"""
-
-    return datetime.now(timezone.utc)
+from app.time_utils import app_now
 
 
 class ScoreRecord(Base):
@@ -32,6 +27,5 @@ class ScoreRecord(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     elapsed_seconds: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     matched_pair_ids: Mapped[str] = mapped_column(Text, nullable=False)
-    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
-
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=app_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=app_now)
