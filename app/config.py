@@ -1,4 +1,4 @@
-"""测验配置和应用常量。"""
+"""应用配置和常量。"""
 
 from dataclasses import dataclass
 import os
@@ -7,44 +7,20 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-@dataclass(frozen=True)
-class WordPair:
-    """单词配对项，使用不可变结构避免运行时被意外改写。"""
-
-    id: int
-    english: str
-    chinese: str
-
-
-QUIZ_ITEMS: tuple[WordPair, ...] = (
-    WordPair(0, "minimalism", "极简主义"),
-    WordPair(1, "fashion icon", "时尚达人"),
-    WordPair(2, "crush", "迷恋；热恋"),
-    WordPair(3, "bike sharing", "共享单车"),
-    WordPair(4, "lovesickness", "相思病"),
-    WordPair(5, "believe it or not", "信不信由你"),
-    WordPair(6, "smoky eyes", "烟熏妆"),
-    WordPair(7, "AI", "人工智能"),
-    WordPair(8, "display affection", "秀恩爱"),
-    WordPair(9, "E-learning", "线上学习"),
-    WordPair(10, "Valentine’s Day", "情人节"),
-    WordPair(11, "gender", "性别"),
-    WordPair(12, "gossip", "八卦"),
-    WordPair(13, "blind date", "相亲"),
-    WordPair(14, "online shopping", "网购"),
-    WordPair(15, "on time", "按时，准时"),
-    WordPair(16, "freedom", "自由"),
-    WordPair(17, "lifestyle", "生活方式"),
-    WordPair(18, "brand", "品牌"),
-    WordPair(19, "log into", "登陆"),
-)
-
 MAX_SCORE = 100
-TOTAL_PAIRS = len(QUIZ_ITEMS)
-POINTS_PER_PAIR = MAX_SCORE / TOTAL_PAIRS
 MAX_ELAPSED_SECONDS = 24 * 60 * 60
 DEFAULT_LEADERBOARD_LIMIT = 10
 MAX_LEADERBOARD_LIMIT = 100
+MIN_QUESTION_ITEM_COUNT = 0
+MAX_QUESTION_ITEM_COUNT = 200
+MAX_QUESTION_TEXT_LENGTH = 120
+MAX_BANK_NAME_LENGTH = 80
+MAX_BANK_DESCRIPTION_LENGTH = 500
+MIN_SLUG_LENGTH = 2
+MAX_SLUG_LENGTH = 60
+ADMIN_SESSION_COOKIE = "quiz_admin_session"
+ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60
+SUPPORTED_SUBMISSION_STYLES = ("classic", "slate", "paper")
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_MYSQL_CHARSET = "utf8mb4"
 DEFAULT_MYSQL_COLLATION = "utf8mb4_unicode_ci"
@@ -69,6 +45,28 @@ class MySQLSettings:
     database: str
     charset: str = DEFAULT_MYSQL_CHARSET
     collation: str = DEFAULT_MYSQL_COLLATION
+
+
+@dataclass(frozen=True)
+class AdminSettings:
+    """后台管理员配置。
+
+    管理员账号、密码和会话签名密钥全部来自环境变量，避免在代码中固化凭据。
+    """
+
+    username: str
+    password: str
+    session_secret: str
+
+
+@dataclass(frozen=True)
+class IpRegionSettings:
+    """IP 地址库配置。
+
+    xdb 文件可能在开发环境不存在，因此缺失时访问记录仍会保存，只是地理位置降级为未知。
+    """
+
+    xdb_path: str | None
 
 
 def load_app_env(env_file: str | Path = ENV_FILE) -> None:
@@ -134,4 +132,36 @@ def load_mysql_settings(env_file: str | Path = ENV_FILE) -> MySQLSettings:
         collation=os.getenv("MYSQL_COLLATION", DEFAULT_MYSQL_COLLATION).strip() or DEFAULT_MYSQL_COLLATION,
     )
 
+
+def load_admin_settings(env_file: str | Path = ENV_FILE) -> AdminSettings:
+    """从环境变量读取后台管理员配置。
+
+    Args:
+        env_file: .env 文件路径。
+
+    Returns:
+        管理员登录和 Cookie 签名配置。
+    """
+
+    load_app_env(env_file)
+    return AdminSettings(
+        username=read_required_env("ADMIN_USERNAME"),
+        password=read_required_env("ADMIN_PASSWORD"),
+        session_secret=read_required_env("ADMIN_SESSION_SECRET"),
+    )
+
+
+def load_ip_region_settings(env_file: str | Path = ENV_FILE) -> IpRegionSettings:
+    """读取 IP 地址库配置。
+
+    Args:
+        env_file: .env 文件路径。
+
+    Returns:
+        地址库路径配置；未配置时返回 None。
+    """
+
+    load_app_env(env_file)
+    xdb_path = os.getenv("IP2REGION_XDB_PATH", "").strip()
+    return IpRegionSettings(xdb_path=xdb_path or None)
 

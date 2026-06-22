@@ -1,6 +1,6 @@
-# 单词配对测验
+# 多题库配对测验系统
 
-这是从 `old/index.html` 重构后的 FastAPI + React + MySQL 版本，支持计时、成绩提交和全局排行榜。
+这是 FastAPI + React + MySQL 的配对题库系统，支持后台管理题库、题目、默认跳转题库、排行榜记录和公开访问记录。
 
 ## 环境准备
 
@@ -10,7 +10,7 @@
 pip install -r requirements.txt
 ```
 
-复制 `.env.example` 为 `.env`，并填写 MySQL 连接信息：
+复制 `.env.example` 为 `.env`，填写数据库和后台管理员配置：
 
 ```bash
 MYSQL_HOST=127.0.0.1
@@ -20,9 +20,13 @@ MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=quiz_db
 MYSQL_CHARSET=utf8mb4
 MYSQL_COLLATION=utf8mb4_unicode_ci
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change_me
+ADMIN_SESSION_SECRET=replace_with_a_long_random_secret
+IP2REGION_XDB_PATH=
 ```
 
-应用启动时会先检测目标数据库是否存在，不存在则自动创建；随后自动创建缺失的数据表，并同步模型中新增或变更的字段、索引和唯一约束。数据库中模型未声明的历史字段会保留，不会自动删除。
+`IP2REGION_XDB_PATH` 是可选项。配置 IPv4 xdb 文件后，访问记录会用 `ip2region` 解析 IP 地理位置；未配置或解析失败时会记录为“未知”。
 
 ## 后端运行
 
@@ -30,7 +34,7 @@ MYSQL_COLLATION=utf8mb4_unicode_ci
 uvicorn main:app --reload
 ```
 
-MySQL 账号需要具备创建数据库和修改表结构的权限，否则启动会失败并输出对应数据库错误。
+应用启动时会自动创建目标数据库、缺失的数据表，并同步模型中新增或变更的字段、索引和唯一约束。数据库中模型未声明的历史字段会保留，不会自动删除。
 
 ## 前端运行
 
@@ -51,12 +55,23 @@ cd ..
 uvicorn main:app --reload
 ```
 
-构建产物会输出到 `static/`，FastAPI 会在根路径返回 React 页面。
+构建产物会输出到 `static/`。FastAPI 会托管 React 页面，并在主域名已配置默认题库时跳转到 `/b/{slug}`。
+
+## 使用入口
+
+- 后台管理：`/admin`
+- 题库公开链接：`/b/{slug}`
+- 题库排行榜：`/b/{slug}/leaderboard`
+
+首次部署后先进入后台创建题库，并设置默认题库。题库支持独立链接、启停、排行榜显示名额和内置提交页样式。
 
 ## 验证
 
 ```bash
 pytest
+cd frontend
+npm run lint
+npm run build
 ```
 
 测试会通过 `create_app(database_url=...)` 使用临时 SQLite 数据库，不依赖本地 MySQL 服务。

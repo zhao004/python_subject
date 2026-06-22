@@ -1,29 +1,65 @@
 # Test FastAPI endpoints
 
 GET http://127.0.0.1:8000/
-Accept: application/json
+Accept: text/html
 
 ###
 
-GET http://127.0.0.1:8000/api/quiz
-Accept: application/json
-
-###
-
-POST http://127.0.0.1:8000/api/scores
+POST http://127.0.0.1:8000/api/admin/login
 Content-Type: application/json
 
 {
-  "student_class": "一班",
-  "student_id": "001",
-  "student_name": "张三",
-  "elapsed_seconds": 75,
-  "matched_pair_ids": [0, 1, 2, 3]
+  "username": "admin",
+  "password": "change_me"
 }
 
 ###
 
-GET http://127.0.0.1:8000/api/leaderboard?limit=10
+POST http://127.0.0.1:8000/api/admin/question-banks
+Content-Type: application/json
+
+{
+  "name": "英语配对",
+  "slug": "english-pairs",
+  "description": "课堂配对练习",
+  "is_active": true,
+  "leaderboard_limit": 10,
+  "submission_style": "classic",
+  "items": [
+    {"left_text": "minimalism", "right_text": "极简主义"},
+    {"left_text": "fashion icon", "right_text": "时尚达人"}
+  ]
+}
+
+###
+
+GET http://127.0.0.1:8000/api/public/question-banks/english-pairs/quiz
 Accept: application/json
 
 ###
+
+POST http://127.0.0.1:8000/api/public/question-banks/english-pairs/scores
+Content-Type: application/json
+
+{
+  "student_class": "一班",
+  "student_id": "000000001",
+  "student_name": "张三",
+  "elapsed_seconds": 75,
+  "matched_pair_ids": [1, 2]
+}
+
+###
+
+GET http://127.0.0.1:8000/api/public/question-banks/english-pairs/leaderboard
+Accept: application/json
+
+###
+
+POST http://127.0.0.1:8000/api/public/access-logs
+Content-Type: application/json
+
+{
+  "page_path": "/b/english-pairs",
+  "question_bank_slug": "english-pairs"
+}
