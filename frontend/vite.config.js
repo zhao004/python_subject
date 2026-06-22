@@ -5,11 +5,13 @@ import react from '@vitejs/plugin-react';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(currentDir, '..');
+const srcDir = resolve(currentDir, 'src');
 
 export default defineConfig(({mode}) => {
     const rootEnv = loadEnv(mode, projectRoot, '');
     const frontendEnv = loadEnv(mode, currentDir, 'VITE_');
     const siteTitle = frontendEnv.VITE_SITE_TITLE || rootEnv.SITE_TITLE || '配对检测系统';
+    const sidebarTitle = frontendEnv.VITE_ADMIN_SIDEBAR_TITLE || rootEnv.ADMIN_SIDEBAR_TITLE || '后台管理';
 
     return {
         plugins: [react(), {
@@ -19,6 +21,11 @@ export default defineConfig(({mode}) => {
             },
         }], define: {
             'import.meta.env.VITE_SITE_TITLE': JSON.stringify(siteTitle),
+            'import.meta.env.VITE_ADMIN_SIDEBAR_TITLE': JSON.stringify(sidebarTitle),
+        },         resolve: {
+            alias: {
+                '@': srcDir,
+            },
         }, build: {
             outDir: '../static', emptyOutDir: true,
         }, server: {

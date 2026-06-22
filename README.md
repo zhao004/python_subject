@@ -13,6 +13,10 @@ pip install -r requirements.txt
 复制 `.env.example` 为 `.env`，填写数据库和后台管理员配置：
 
 ```bash
+# 网站标题（浏览器标签页标题）
+SITE_TITLE=配对检测系统
+# 后台侧边栏顶部标题文案
+ADMIN_SIDEBAR_TITLE=后台管理
 MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=root

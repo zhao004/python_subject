@@ -1,0 +1,225 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * CSS 变量与主题定义
+ *
+ * 双设计系统：
+ * 1. 公开端：暖色调 token（--brand 系列），通过 .public-style-{classic,slate,paper} 换肤
+ * 2. 后台：shadcn 标准 token（HSL 格式），通过 .dark 类切换暗色模式
+ */
+
+/* ==================== 公开端 Token（暖色调） ==================== */
+:root {
+  --page-bg: #edf2ef;
+  --surface: #fffdf8;
+  --surface-rgb: 255, 253, 248;
+  --surface-muted: #f5f7f1;
+  --surface-cool: #e9f3f1;
+  --surface-warm: #fff3dc;
+  --brand: #143f3e;
+  --brand-strong: #0d2c2b;
+  --accent: #c66f2e;
+  --accent-soft: #f3d1a2;
+  --text: #172f2d;
+  --text-soft: #63736d;
+  --line: #ccd9d1;
+  --line-strong: #adbbb4;
+  --success: #2f764b;
+  --danger: #ae463d;
+  --selected: #dceafd;
+  --selected-border: #5b8ee8;
+  --matched-bg: #e7efe4;
+  --hero-accent: #f2ca70;
+  --hero-text: #dce9e4;
+  --message-bg: #fff8e8;
+  --message-text: #73510f;
+  --input-light-bg: #fffefa;
+  --focus-ring-rgb: 47, 124, 132;
+  --shadow-soft: 0 0.8rem 2rem rgba(30, 49, 45, 0.12);
+  --radius: 0.5rem;
+}
+
+/* 经典主题（显式声明，与默认 :root 一致） */
+.public-style-classic {
+  --brand: #143f3e;
+  --brand-strong: #0d2c2b;
+  --accent: #c66f2e;
+  --accent-soft: #f3d1a2;
+  --surface-cool: #e9f3f1;
+  --surface-warm: #fff3dc;
+  --surface-rgb: 255, 253, 248;
+  --selected-border: #5b8ee8;
+  --matched-bg: #e7efe4;
+  --hero-accent: #f2ca70;
+  --hero-text: #dce9e4;
+  --message-bg: #fff8e8;
+  --message-text: #73510f;
+  --input-light-bg: #fffefa;
+  --focus-ring-rgb: 47, 124, 132;
+}
+
+/* 板岩主题 */
+.public-style-slate {
+  --brand: #1d3035;
+  --brand-strong: #0f1d20;
+  --accent: #d8a23b;
+  --accent-soft: #f0d79d;
+  --surface: #f7faf8;
+  --surface-rgb: 247, 250, 248;
+  --surface-cool: #e4eef0;
+  --surface-warm: #fff4d2;
+  --selected-border: #5b8ee8;
+  --matched-bg: #dfe7e9;
+  --hero-accent: #d4b87a;
+  --hero-text: #d0dde0;
+  --message-bg: #f5f0e0;
+  --message-text: #5c5530;
+  --input-light-bg: #f8faf8;
+  --focus-ring-rgb: 47, 124, 132;
+}
+
+/* 纸张主题 */
+.public-style-paper {
+  --brand: #3a4a2c;
+  --brand-strong: #26331e;
+  --accent: #8b5d43;
+  --accent-soft: #e8cdb4;
+  --surface: #fffaf0;
+  --surface-rgb: 255, 250, 240;
+  --surface-cool: #eaf0e0;
+  --surface-warm: #f8e7c6;
+  --selected-border: #5b8ee8;
+  --matched-bg: #ebe6d6;
+  --hero-accent: #c4a67a;
+  --hero-text: #e0d8c8;
+  --message-bg: #faf2e0;
+  --message-text: #6b4f2e;
+  --input-light-bg: #fffef5;
+  --focus-ring-rgb: 90, 110, 70;
+}
+
+/* ==================== 后台 shadcn Token（冷蓝色调） ==================== */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 224 71% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 71% 4%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 224 71% 4%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 220 9% 32%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
+  --accent-hsl: 220 14% 96%;
+  --accent-hsl-foreground: 220 9% 32%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 221 83% 53%;
+}
+
+.dark {
+  --background: 224 71% 4%;
+  --foreground: 210 20% 98%;
+  --card: 224 71% 6%;
+  --card-foreground: 210 20% 98%;
+  --popover: 224 71% 6%;
+  --popover-foreground: 210 20% 98%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 215 28% 17%;
+  --secondary-foreground: 210 20% 98%;
+  --muted: 215 28% 17%;
+  --muted-foreground: 218 11% 65%;
+  --accent-hsl: 215 28% 17%;
+  --accent-hsl-foreground: 210 20% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 20% 98%;
+  --border: 215 28% 17%;
+  --input: 215 28% 17%;
+  --ring: 217 91% 60%;
+}
+
+/* ==================== 全局基础样式 ==================== */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 20rem;
+  }
+
+  body {
+    min-width: 20rem;
+    min-height: 100vh;
+    margin: 0;
+    color: var(--text);
+    background:
+      linear-gradient(90deg, rgba(20, 63, 62, 0.06) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(20, 63, 62, 0.05) 1px, transparent 1px),
+      linear-gradient(180deg, #fafcf9 0%, var(--page-bg) 52%, #e1e9e4 100%);
+    background-size: 1.6rem 1.6rem, 1.6rem 1.6rem, auto;
+    font-family:
+      "Inter",
+      "PingFang SC",
+      "Microsoft YaHei",
+      system-ui,
+      sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+
+  h1 {
+    font-family: "Noto Serif SC", "Songti SC", "STSong", Georgia, serif;
+    font-size: 2rem;
+    line-height: 1.12;
+  }
+
+  h2 {
+    font-size: 1.15rem;
+    line-height: 1.25;
+  }
+
+  h3 {
+    font-size: 0.95rem;
+  }
+
+  @media (min-width: 48rem) {
+    h1 {
+      font-size: 2.25rem;
+    }
+  }
+
+  @media (min-width: 68.75rem) {
+    h1 {
+      font-size: 2.55rem;
+    }
+  }
+}
+
+/* ==================== 公开端渐变背景工具类 ==================== */
+@layer utilities {
+  .hero-gradient {
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(135deg, var(--brand-strong), var(--brand));
+    background-size: 1rem 1rem, auto;
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+}
