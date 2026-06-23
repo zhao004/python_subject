@@ -145,6 +145,19 @@
   --ring: 217 91% 60%;
 }
 
+/* 深色模式下 body 背景与文字色覆盖
+ * 公开端暖色渐变在后台深色模式下需替换为冷调暗色，
+ * 否则 overscroll / 间隙区域暴露浅色背景。
+ * 注意：ThemeProvider 卸载时会移除 .dark 类，公开端不受影响。 */
+.dark body {
+  color: hsl(210 20% 98%);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(180deg, hsl(224 71% 5%) 0%, hsl(224 71% 4%) 52%, hsl(224 71% 3%) 100%);
+  background-size: 1.6rem 1.6rem, 1.6rem 1.6rem, auto;
+}
+
 /* ==================== 全局基础样式 ==================== */
 @layer base {
   * {

@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Edit, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Plus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   fetchQuestionBank,
   fetchLeaderboard,
   createLeaderboardRecord,
@@ -45,8 +52,10 @@ import {
   batchDeleteLeaderboardRecords,
 } from "./api";
 import type { LeaderboardRecord, LeaderboardRecordPayload } from "./types";
+import { exportToExcel, fetchAllPages } from "@/lib/export-excel";
 
-const PAGE_SIZE = 25;
+/** 可选每页条数 */
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 const STUDENT_ID_PATTERN = /^\d{9}$/;
 
 /** 秒 → h:mm:ss 或 mm:ss */
@@ -85,13 +94,15 @@ export default function BankLeaderboard() {
   const { id: bankId } = useParams();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(20);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<LeaderboardRecord | null>(null);
   const [form, setForm] = useState<LeaderboardRecordPayload>(EMPTY_FORM);
   const [formError, setFormError] = useState("");
+  const [exporting, setExporting] = useState(false);
 
-  const offset = (page - 1) * PAGE_SIZE;
+  const offset = (page - 1) * pageSize;
 
   /** 获取题库名称 */
   const { data: bank } = useQuery({
@@ -102,15 +113,15 @@ export default function BankLeaderboard() {
 
   /** 排行榜列表 */
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-leaderboard", bankId, offset],
+    queryKey: ["admin-leaderboard", bankId, offset, pageSize],
     queryFn: () =>
-      fetchLeaderboard(bankId!, { limit: PAGE_SIZE, offset }),
+      fetchLeaderboard(bankId!, { limit: pageSize, offset }),
     enabled: Boolean(bankId),
   });
 
   const entries = data?.entries ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   /** 打开新增对话框 */
   const openCreateDialog = () => {
@@ -207,6 +218,56 @@ export default function BankLeaderboard() {
     saveMutation.mutate();
   };
 
+  /** 导出当前题库排行榜全量数据为 Excel */
+  const handleExport = async () => {
+    if (!bankId) return;
+    setExporting(true);
+    try {
+      const allEntries = await fetchAllPages(
+        (offset, limit) => fetchLeaderboard(bankId, { limit, offset }),
+        100,
+      );
+      if (allEntries.length === 0) {
+        toast.warning("没有可导出的数据");
+        return;
+      }
+      const rows = allEntries.map((r, idx) => ({
+        rank: idx + 1,
+        student_class: r.student_class,
+        student_id: r.student_id,
+        student_name: r.student_name,
+        score: r.score,
+        correct_count: r.correct_count,
+        total_pairs: r.total_pairs,
+        elapsed: formatElapsed(r.elapsed_seconds),
+        type: r.is_manual ? "手工" : "系统",
+        submitted_at: formatDateTime(r.submitted_at),
+      }));
+      exportToExcel(
+        `排行榜_${bank?.name ?? bankId}_${new Date().toISOString().slice(0, 10)}`,
+        "排行榜",
+        [
+          { key: "rank", label: "排名" },
+          { key: "student_class", label: "班级" },
+          { key: "student_id", label: "学号" },
+          { key: "student_name", label: "姓名" },
+          { key: "score", label: "分数" },
+          { key: "correct_count", label: "正确数" },
+          { key: "total_pairs", label: "总题数" },
+          { key: "elapsed", label: "用时" },
+          { key: "type", label: "类型" },
+          { key: "submitted_at", label: "提交时间" },
+        ],
+        rows,
+      );
+      toast.success(`已导出 ${rows.length} 条记录`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "导出失败");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* 标题 */}
@@ -224,28 +285,64 @@ export default function BankLeaderboard() {
 
       {/* 操作栏 */}
       <div className="flex items-center justify-between">
-        {selectedIds.size > 0 ? (
+        <div className="flex items-center gap-3">
+          {selectedIds.size > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                已选 {selectedIds.size} 项
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => batchDeleteMutation.mutate([...selectedIds])}
+                disabled={batchDeleteMutation.isPending}
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                批量删除
+              </Button>
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">共 {total} 条记录</span>
+          )}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              已选 {selectedIds.size} 项
-            </span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => batchDeleteMutation.mutate([...selectedIds])}
-              disabled={batchDeleteMutation.isPending}
+            <span className="text-sm text-muted-foreground">每页</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(val) => {
+                setPageSize(Number(val));
+                setPage(1);
+                setSelectedIds(new Set());
+              }}
             >
-              <Trash2 className="mr-1 h-4 w-4" />
-              批量删除
-            </Button>
+              <SelectTrigger className="w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">条</span>
           </div>
-        ) : (
-          <span className="text-sm text-muted-foreground">共 {total} 条记录</span>
-        )}
-        <Button onClick={openCreateDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          新增记录
-        </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={exporting}
+          >
+            <Download className="mr-1 h-4 w-4" />
+            {exporting ? "导出中..." : "导出 Excel"}
+          </Button>
+          <Button onClick={openCreateDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            新增记录
+          </Button>
+        </div>
       </div>
 
       {/* 列表 */}

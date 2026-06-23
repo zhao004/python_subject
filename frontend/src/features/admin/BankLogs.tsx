@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,12 +27,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   fetchQuestionBank,
   fetchSubmissionLogs,
   batchDeleteSubmissionLogs,
 } from "./api";
+import { exportToExcel, fetchAllPages } from "@/lib/export-excel";
 
-const PAGE_SIZE = 25;
+/** 可选每页条数 */
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 
 /** 秒 → m:ss */
 function formatElapsed(seconds: number): string {
@@ -56,9 +65,11 @@ export default function BankLogs() {
   const { id: bankId } = useParams();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(20);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [exporting, setExporting] = useState(false);
 
-  const offset = (page - 1) * PAGE_SIZE;
+  const offset = (page - 1) * pageSize;
 
   const { data: bank } = useQuery({
     queryKey: ["admin-question-bank", bankId],
@@ -67,14 +78,14 @@ export default function BankLogs() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-submission-logs", bankId, offset],
-    queryFn: () => fetchSubmissionLogs(bankId!, { limit: PAGE_SIZE, offset }),
+    queryKey: ["admin-submission-logs", bankId, offset, pageSize],
+    queryFn: () => fetchSubmissionLogs(bankId!, { limit: pageSize, offset }),
     enabled: Boolean(bankId),
   });
 
   const entries = data?.entries ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const batchDeleteMutation = useMutation({
     mutationFn: (ids: number[]) => batchDeleteSubmissionLogs(bankId!, ids),
@@ -103,19 +114,78 @@ export default function BankLogs() {
     });
   };
 
+  /** 导出当前题库全量提交流水为 Excel */
+  const handleExport = async () => {
+    if (!bankId) return;
+    setExporting(true);
+    try {
+      const allEntries = await fetchAllPages(
+        (offset, limit) => fetchSubmissionLogs(bankId, { limit, offset }),
+        100,
+      );
+      if (allEntries.length === 0) {
+        toast.warning("没有可导出的数据");
+        return;
+      }
+      const rows = allEntries.map((log) => ({
+        student_class: log.student_class,
+        student_id: log.student_id,
+        student_name: log.student_name,
+        score: log.score,
+        correct_count: log.correct_count,
+        total_pairs: log.total_pairs,
+        elapsed: formatElapsed(log.elapsed_seconds),
+        type: log.is_manual ? "手工" : "系统",
+        submitted_at: formatDateTime(log.submitted_at),
+      }));
+      exportToExcel(
+        `提交流水_${bank?.name ?? bankId}_${new Date().toISOString().slice(0, 10)}`,
+        "提交流水",
+        [
+          { key: "student_class", label: "班级" },
+          { key: "student_id", label: "学号" },
+          { key: "student_name", label: "姓名" },
+          { key: "score", label: "分数" },
+          { key: "correct_count", label: "正确数" },
+          { key: "total_pairs", label: "总题数" },
+          { key: "elapsed", label: "用时" },
+          { key: "type", label: "类型" },
+          { key: "submitted_at", label: "提交时间" },
+        ],
+        rows,
+      );
+      toast.success(`已导出 ${rows.length} 条记录`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "导出失败");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* 标题 */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/admin/question-banks">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">提交流水</h1>
-          {bank && <p className="text-sm text-muted-foreground">{bank.name}</p>}
+      {/* 标题 + 导出 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/admin/question-banks">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">提交流水</h1>
+            {bank && <p className="text-sm text-muted-foreground">{bank.name}</p>}
+          </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          <Download className="mr-1 h-4 w-4" />
+          {exporting ? "导出中..." : "导出 Excel"}
+        </Button>
       </div>
 
       {/* 操作栏 */}
@@ -138,6 +208,29 @@ export default function BankLogs() {
         ) : (
           <span className="text-sm text-muted-foreground">共 {total} 条记录</span>
         )}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">每页</span>
+          <Select
+            value={String(pageSize)}
+            onValueChange={(val) => {
+              setPageSize(Number(val));
+              setPage(1);
+              setSelectedIds(new Set());
+            }}
+          >
+            <SelectTrigger className="w-[80px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground">条</span>
+        </div>
       </div>
 
       {/* 列表 */}

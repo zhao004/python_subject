@@ -7,7 +7,7 @@
  * echarts-for-react 改为 lazy import 减小公开端 bundle 体积。
  */
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import {
   BookOpen,
   CheckCircle,
@@ -40,6 +40,20 @@ import type {
 } from "./types";
 
 const ReactECharts = lazy(() => import("echarts-for-react"));
+
+/** ECharts 渲染配置（模块级常量，避免每次渲染创建新对象触发组件重建） */
+const CHART_OPTS = { renderer: "canvas" as const };
+
+/** 趋势图配色 */
+const CHART_COLORS = [
+  "#0070f3",
+  "#7928ca",
+  "#f5a623",
+  "#30a46c",
+  "#e5484d",
+  "#f81ce5",
+  "#50e3c2",
+];
 
 /** 指标卡 */
 function MetricCard({
@@ -101,60 +115,56 @@ export default function Dashboard() {
   const banks: QuestionBank[] = banksData?.entries ?? [];
   const trendData: SubmissionTrendResponse | undefined = trend;
 
-  /** ECharts 配置 */
-  const chartOption = {
-    backgroundColor: "transparent",
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-    },
-    legend: {
-      data: trendData?.series?.map((b) => b.bank_name) ?? [],
-      textStyle: { color: isDark ? "#a1a1aa" : "#666" },
-    },
-    grid: {
-      left: "3%",
-      right: "4%",
-      bottom: "3%",
-      containLabel: true,
-    },
-    xAxis: {
-      type: "category",
-      data: trendData?.dates ?? [],
-      axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
-      axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
-    },
-    yAxis: {
-      type: "value",
-      axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
-      axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
-      splitLine: { lineStyle: { color: isDark ? "#27272a" : "#eee" } },
-    },
-    series:
-      trendData?.series?.map((bank, i) => ({
-        name: bank.bank_name,
-        type: "bar",
-        stack: "total",
-        data: bank.data,
-        itemStyle: {
-          color: [
-            "#0070f3",
-            "#7928ca",
-            "#f5a623",
-            "#30a46c",
-            "#e5484d",
-            "#f81ce5",
-            "#50e3c2",
-          ][i % 7],
-        },
-      })) ?? [],
-  };
+  /** ECharts 配置（useMemo 避免每次渲染重建对象） */
+  const chartOption = useMemo(
+    () => ({
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+      },
+      legend: {
+        data: trendData?.series?.map((b) => b.bank_name) ?? [],
+        textStyle: { color: isDark ? "#a1a1aa" : "#666" },
+      },
+      grid: {
+        left: "3%",
+        right: "4%",
+        bottom: "3%",
+        containLabel: true,
+      },
+      xAxis: {
+        type: "category",
+        data: trendData?.dates ?? [],
+        axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
+        axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
+      },
+      yAxis: {
+        type: "value",
+        axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
+        axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
+        splitLine: { lineStyle: { color: isDark ? "#27272a" : "#eee" } },
+      },
+      series:
+        trendData?.series?.map((bank, i) => ({
+          name: bank.bank_name,
+          type: "bar",
+          stack: "total",
+          data: bank.data,
+          itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length] },
+        })) ?? [],
+    }),
+    [trendData, isDark],
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">概览</h1>
-        <Select value={bankFilter || "all"} onValueChange={setBankFilter}>
+        <Select
+          value={bankFilter || "all"}
+          onValueChange={(v) => setBankFilter(v === "all" ? "" : v)}
+        >
           <SelectTrigger className="w-48">
             <SelectValue placeholder="全部题库" />
           </SelectTrigger>
@@ -214,8 +224,9 @@ export default function Dashboard() {
             <Suspense fallback={<Skeleton className="h-[340px] w-full" />}>
               <ReactECharts
                 option={chartOption}
+                notMerge
                 style={{ height: "340px", width: "100%" }}
-                opts={{ renderer: "canvas" }}
+                opts={CHART_OPTS}
               />
             </Suspense>
           )}

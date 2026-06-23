@@ -10,7 +10,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trophy, ClipboardList, Pencil, Trash2, ListChecks } from "lucide-react";
+import { Plus, Trophy, ClipboardList, Pencil, Trash2, ListChecks, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -278,6 +278,17 @@ export default function QuestionBanksList() {
                           aria-label="编辑"
                         >
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <a
+                            href={`/b/${bank.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="新窗口打开题库"
+                          >
+                            <ExternalLink className="mr-1 h-4 w-4" />
+                            跳转
+                          </a>
                         </Button>
                         <Button variant="ghost" size="sm" asChild>
                           <Link to={`/admin/question-banks/${bank.id}/items`}>

@@ -8,10 +8,10 @@ const projectRoot = resolve(currentDir, '..');
 const srcDir = resolve(currentDir, 'src');
 
 export default defineConfig(({mode}) => {
+    // 网站标题与侧边栏标题统一从项目根目录 .env 读取，前端目录不再单独配置
     const rootEnv = loadEnv(mode, projectRoot, '');
-    const frontendEnv = loadEnv(mode, currentDir, 'VITE_');
-    const siteTitle = frontendEnv.VITE_SITE_TITLE || rootEnv.SITE_TITLE || '配对检测系统';
-    const sidebarTitle = frontendEnv.VITE_ADMIN_SIDEBAR_TITLE || rootEnv.ADMIN_SIDEBAR_TITLE || '后台管理';
+    const siteTitle = rootEnv.SITE_TITLE || '配对检测系统';
+    const sidebarTitle = rootEnv.ADMIN_SIDEBAR_TITLE || '后台管理';
 
     return {
         plugins: [react(), {

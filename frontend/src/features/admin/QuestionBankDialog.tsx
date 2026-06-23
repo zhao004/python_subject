@@ -50,6 +50,9 @@ const STYLE_CHOICES: { value: SubmissionStyleKey; label: string }[] = [
   { value: "paper", label: "纸张" },
 ];
 
+/** 有效提交样式值集合，用于校验后端返回值 */
+const VALID_STYLES = STYLE_CHOICES.map((c) => c.value);
+
 /** 表单值类型（items 保留用于整体提交，不在弹窗中编辑） */
 interface BankFormValues {
   name: string;
@@ -80,7 +83,11 @@ function bankToForm(bank: QuestionBank): BankFormValues {
     description: bank.description ?? "",
     is_active: bank.is_active,
     leaderboard_limit: bank.leaderboard_limit,
-    submission_style: bank.submission_style,
+    // 防御性处理：后端可能返回空字符串或不在选项中的旧值，
+    // 此时回退到默认值 "classic"，避免 Select 显示为空、提交校验失败。
+    submission_style: VALID_STYLES.includes(bank.submission_style)
+      ? bank.submission_style
+      : "classic",
     items:
       (bank.items ?? []).length > 0
         ? (bank.items ?? []).map((item) => ({
@@ -163,7 +170,12 @@ export default function QuestionBankDialog({
       }
       return createQuestionBank(payload);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // 编辑模式：后端 PUT 返回最新题库详情，直接写入单条缓存，
+      // 避免再次打开编辑弹窗时命中 staleTime 内的旧数据。
+      if (isEdit && bankId !== null) {
+        queryClient.setQueryData(["admin-question-bank", bankId], data);
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-question-banks"] });
       queryClient.invalidateQueries({ queryKey: ["admin-banks-for-filter"] });
       queryClient.invalidateQueries({ queryKey: ["admin-banks-for-settings"] });
@@ -285,7 +297,7 @@ export default function QuestionBankDialog({
                     render={({ field }) => (
                       <Select value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="请选择提交样式" />
                         </SelectTrigger>
                         <SelectContent>
                           {STYLE_CHOICES.map((choice) => (
