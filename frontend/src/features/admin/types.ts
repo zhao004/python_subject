@@ -19,6 +19,7 @@ export interface QuestionBank {
   name: string;
   slug: string;
   description: string;
+  announcement: string;
   is_active: boolean;
   leaderboard_limit: number;
   submission_style: SubmissionStyleKey;
@@ -33,6 +34,7 @@ export interface QuestionBankPayload {
   name: string;
   slug: string;
   description: string;
+  announcement: string;
   is_active: boolean;
   leaderboard_limit: number;
   submission_style: SubmissionStyleKey;

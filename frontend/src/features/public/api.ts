@@ -7,6 +7,11 @@ import type {
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
+type ApiErrorBody = {
+  detail?: string | Array<{ msg?: string }>;
+  [key: string]: unknown;
+};
+
 /**
  * 解析 API 响应，失败时抛出带中文提示的异常。
  *
@@ -14,8 +19,8 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
  * @returns JSON 响应体。
  * @throws {Error} 当服务端返回非 2xx 或响应不可解析时抛出。
  */
-async function parseJsonResponse(response: Response): Promise<any> {
-  let body = null;
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  let body: unknown = null;
   try {
     body = await response.json();
   } catch {
@@ -23,13 +28,14 @@ async function parseJsonResponse(response: Response): Promise<any> {
   }
 
   if (!response.ok) {
-    const detail = Array.isArray(body.detail)
-      ? body.detail.map((item: { msg: string }) => item.msg).join("；")
-      : body.detail;
+    const errorBody = body as ApiErrorBody;
+    const detail = Array.isArray(errorBody.detail)
+      ? errorBody.detail.map((item) => item.msg ?? "校验错误").join("；")
+      : errorBody.detail;
     throw new Error(detail || "请求失败，请稍后重试");
   }
 
-  return body;
+  return body as T;
 }
 
 /**
@@ -58,7 +64,7 @@ async function parseEmptyResponse(response: Response): Promise<void> {
  * @param options 请求选项。
  * @returns 响应体。
  */
-async function fetchJson(url: string, options: RequestInit = {}): Promise<any> {
+async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {
     credentials: "same-origin",
     ...options,
@@ -67,7 +73,7 @@ async function fetchJson(url: string, options: RequestInit = {}): Promise<any> {
       ...(options.headers || {}),
     },
   });
-  return parseJsonResponse(response);
+  return parseJsonResponse<T>(response);
 }
 
 /**

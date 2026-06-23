@@ -2,7 +2,6 @@ import { lazy, Suspense, useMemo } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { PublicApp, readRoute } from "@/features/public/PublicApp";
-import { SITE_TITLE } from "@/features/public/constants";
 
 /** 后台管理应用懒加载，避免公开端加载后台依赖 */
 const AdminAppLazy = lazy(() => import("@/features/admin/AdminApp"));

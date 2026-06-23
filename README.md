@@ -27,8 +27,11 @@ MYSQL_COLLATION=utf8mb4_unicode_ci
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change_me
 ADMIN_SESSION_SECRET=replace_with_a_long_random_secret
+ADMIN_COOKIE_SECURE=false
 IP2REGION_XDB_PATH=
 ```
+
+`ADMIN_SESSION_SECRET` 至少需要 32 个字符。生产环境使用 HTTPS 时建议将 `ADMIN_COOKIE_SECURE` 设置为 `true`；本地 HTTP 开发保持 `false`。
 
 `IP2REGION_XDB_PATH` 是可选项。配置 IPv4 xdb 文件后，访问记录会用 `ip2region` 解析 IP 地理位置；未配置或解析失败时会记录为“未知”。
 
@@ -75,6 +78,7 @@ uvicorn main:app --reload
 pytest
 cd frontend
 npm run lint
+npm run typecheck
 npm run build
 ```
 

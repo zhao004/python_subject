@@ -217,7 +217,7 @@ def login_admin(payload: AdminLoginRequest, response: Response) -> AdminSessionR
     """后台登录。"""
 
     settings = authenticate_admin(payload.username, payload.password)
-    set_admin_cookie(response, create_session_token(settings))
+    set_admin_cookie(response, create_session_token(settings), settings)
     return AdminSessionResponse(authenticated=True, username=settings.username)
 
 

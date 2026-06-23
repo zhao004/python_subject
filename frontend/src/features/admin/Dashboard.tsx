@@ -16,7 +16,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useThemeMode } from "@/lib/theme";
-import { httpClient, apiUrl } from "@/lib/http-client";
 import { useQuery } from "@tanstack/react-query";
 import {
   Card,
@@ -34,7 +33,6 @@ import {
 } from "@/components/ui/select";
 import { fetchOverview, fetchSubmissionTrend, fetchQuestionBanks } from "./api";
 import type {
-  AdminOverviewStats,
   SubmissionTrendResponse,
   QuestionBank,
 } from "./types";

@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -43,21 +44,25 @@ import type {
   SubmissionStyleKey,
 } from "./types";
 
-/** 提交样式选项 */
+/** 主题风格选项 */
 const STYLE_CHOICES: { value: SubmissionStyleKey; label: string }[] = [
-  { value: "classic", label: "经典" },
-  { value: "slate", label: "板岩" },
-  { value: "paper", label: "纸张" },
+  { value: "classic", label: "经典风格" },
+  { value: "slate", label: "板岩风格" },
+  { value: "paper", label: "纸张风格" },
 ];
 
-/** 有效提交样式值集合，用于校验后端返回值 */
-const VALID_STYLES = STYLE_CHOICES.map((c) => c.value);
+/** 默认主题风格，接口返回缺失值或历史脏值时使用。 */
+const DEFAULT_SUBMISSION_STYLE: SubmissionStyleKey = "classic";
+
+/** 有效主题风格值集合，用于校验后端返回值。 */
+const VALID_STYLES = new Set<SubmissionStyleKey>(STYLE_CHOICES.map((c) => c.value));
 
 /** 表单值类型（items 保留用于整体提交，不在弹窗中编辑） */
 interface BankFormValues {
   name: string;
   slug: string;
   description: string;
+  announcement: string;
   is_active: boolean;
   leaderboard_limit: number;
   submission_style: SubmissionStyleKey;
@@ -69,11 +74,20 @@ const DEFAULT_VALUES: BankFormValues = {
   name: "",
   slug: "",
   description: "",
+  announcement: "",
   is_active: true,
   leaderboard_limit: 10,
-  submission_style: "classic",
+  submission_style: DEFAULT_SUBMISSION_STYLE,
   items: [],
 };
+
+/** 归一化主题风格，避免 Select 收到 undefined、空字符串或历史非法值后显示为空。 */
+function normalizeSubmissionStyle(value: unknown): SubmissionStyleKey {
+  if (typeof value === "string" && VALID_STYLES.has(value as SubmissionStyleKey)) {
+    return value as SubmissionStyleKey;
+  }
+  return DEFAULT_SUBMISSION_STYLE;
+}
 
 /** 将题库数据转为表单值 */
 function bankToForm(bank: QuestionBank): BankFormValues {
@@ -81,13 +95,11 @@ function bankToForm(bank: QuestionBank): BankFormValues {
     name: bank.name,
     slug: bank.slug,
     description: bank.description ?? "",
+    announcement: bank.announcement ?? "",
     is_active: bank.is_active,
     leaderboard_limit: bank.leaderboard_limit,
-    // 防御性处理：后端可能返回空字符串或不在选项中的旧值，
-    // 此时回退到默认值 "classic"，避免 Select 显示为空、提交校验失败。
-    submission_style: VALID_STYLES.includes(bank.submission_style)
-      ? bank.submission_style
-      : "classic",
+    // 防御性处理：后端或缓存可能返回空字符串、缺失值或不在选项中的历史旧值。
+    submission_style: normalizeSubmissionStyle(bank.submission_style),
     items:
       (bank.items ?? []).length > 0
         ? (bank.items ?? []).map((item) => ({
@@ -104,9 +116,10 @@ function transformPayload(values: BankFormValues): QuestionBankPayload {
     name: values.name.trim(),
     slug: values.slug.trim(),
     description: values.description.trim(),
+    announcement: values.announcement.trim(),
     is_active: values.is_active,
     leaderboard_limit: Number(values.leaderboard_limit),
-    submission_style: values.submission_style,
+    submission_style: normalizeSubmissionStyle(values.submission_style),
     items: values.items
       .map((item) => ({
         left_text: item.left_text.trim(),
@@ -133,7 +146,7 @@ export default function QuestionBankDialog({
   const queryClient = useQueryClient();
 
   /** 编辑模式：加载题库数据 */
-  const { data: bank, isLoading } = useQuery({
+  const { data: bank, isLoading, isError, error } = useQuery({
     queryKey: ["admin-question-bank", bankId],
     queryFn: () => fetchQuestionBank(bankId!),
     enabled: isEdit && open,
@@ -154,12 +167,14 @@ export default function QuestionBankDialog({
   /** 编辑模式：数据加载后填充表单；新建模式：弹窗打开时重置为默认值 */
   useEffect(() => {
     if (!open) return;
+    if (!isEdit) {
+      reset(DEFAULT_VALUES);
+      return;
+    }
     if (bank) {
       reset(bankToForm(bank));
-    } else {
-      reset(DEFAULT_VALUES);
     }
-  }, [bank, reset, open]);
+  }, [bank, isEdit, reset, open]);
 
   /** 创建/更新 mutation */
   const mutation = useMutation({
@@ -171,10 +186,15 @@ export default function QuestionBankDialog({
       return createQuestionBank(payload);
     },
     onSuccess: (data) => {
-      // 编辑模式：后端 PUT 返回最新题库详情，直接写入单条缓存，
-      // 避免再次打开编辑弹窗时命中 staleTime 内的旧数据。
+      const normalizedData = {
+        ...data,
+        announcement: data.announcement ?? "",
+        submission_style: normalizeSubmissionStyle(data.submission_style),
+      };
+      // 编辑模式：先写入规范化详情，再让单条详情失效；下次打开时以服务端最新数据为准。
       if (isEdit && bankId !== null) {
-        queryClient.setQueryData(["admin-question-bank", bankId], data);
+        queryClient.setQueryData(["admin-question-bank", bankId], normalizedData);
+        queryClient.invalidateQueries({ queryKey: ["admin-question-bank", bankId] });
       }
       queryClient.invalidateQueries({ queryKey: ["admin-question-banks"] });
       queryClient.invalidateQueries({ queryKey: ["admin-banks-for-filter"] });
@@ -207,7 +227,11 @@ export default function QuestionBankDialog({
           <DialogTitle>{isEdit ? "编辑题库" : "新建题库"}</DialogTitle>
         </DialogHeader>
 
-        {isEdit && isLoading ? (
+        {isEdit && isError ? (
+          <div className="py-4 text-sm text-destructive">
+            {error instanceof Error ? error.message : "题库加载失败，请关闭后重试"}
+          </div>
+        ) : isEdit && (isLoading || !bank) ? (
           <div className="space-y-4 py-4">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
@@ -290,21 +314,28 @@ export default function QuestionBankDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>提交样式</Label>
+                  <Label>主题风格</Label>
                   <Controller
                     control={control}
                     name="submission_style"
                     render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select
+                        value={normalizeSubmissionStyle(field.value)}
+                        onValueChange={(value) =>
+                          field.onChange(normalizeSubmissionStyle(value))
+                        }
+                      >
                         <SelectTrigger>
-                          <SelectValue placeholder="请选择提交样式" />
+                          <SelectValue placeholder="请选择主题风格" />
                         </SelectTrigger>
                         <SelectContent>
-                          {STYLE_CHOICES.map((choice) => (
-                            <SelectItem key={choice.value} value={choice.value}>
-                              {choice.label}
-                            </SelectItem>
-                          ))}
+                          <SelectGroup>
+                            {STYLE_CHOICES.map((choice) => (
+                              <SelectItem key={choice.value} value={choice.value}>
+                                {choice.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                     )}

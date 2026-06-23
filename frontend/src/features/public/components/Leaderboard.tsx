@@ -228,7 +228,7 @@ export function LeaderboardPage({
               显示前 {quiz.question_bank.leaderboard_limit} 名，同分时用时更短排名更靠前。
             </p>
           </div>
-          <Button variant="secondary" onClick={onNavigateHome}>
+          <Button variant="publicSecondary" onClick={onNavigateHome}>
             返回答题
           </Button>
         </header>

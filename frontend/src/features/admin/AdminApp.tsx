@@ -9,7 +9,7 @@
  * 路由命名已统一为 question-banks（消除原 /admin/banks/:id 分裂）。
  */
 
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   Navigate,
   Route,
@@ -34,16 +34,20 @@ import SettingsPage from "./SettingsPage";
 
 /** 认证守卫：未认证时重定向到登录页 */
 function AuthGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isCheckingSession } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (isCheckingSession) {
+      return;
+    }
     if (!isAuthenticated) {
       navigate("/admin/login", { replace: true, state: { from: location } });
     }
-  }, [isAuthenticated, location, navigate]);
+  }, [isAuthenticated, isCheckingSession, location, navigate]);
 
+  if (isCheckingSession) return <LoadingFallback />;
   if (!isAuthenticated) return null;
   return <>{children}</>;
 }

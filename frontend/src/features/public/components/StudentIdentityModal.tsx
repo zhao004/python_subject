@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { StudentFields } from "./Common";
 import type { StudentForm } from "../types";
 
@@ -14,6 +15,7 @@ interface StudentIdentityModalProps {
   errorMessage: string;
   form: StudentForm;
   rememberStudent: boolean;
+  styleClass: string;
   onConfirm: () => void;
   onFormChange: (fieldName: keyof StudentForm, value: string) => void;
   onRememberChange: (checked: boolean) => void;
@@ -34,6 +36,7 @@ export function StudentIdentityModal({
   errorMessage,
   form,
   rememberStudent,
+  styleClass,
   onConfirm,
   onFormChange,
   onRememberChange,
@@ -41,7 +44,10 @@ export function StudentIdentityModal({
   return (
     <Dialog open={open}>
       <DialogContent
-        className="max-w-[34rem] gap-4 p-4"
+        className={cn(
+          styleClass,
+          "max-w-[34rem] gap-4 border-brand-line bg-brand-surface p-4 text-brand-text",
+        )}
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -67,6 +73,7 @@ export function StudentIdentityModal({
           <label className="flex items-center gap-2.5 font-bold leading-snug text-brand-text">
             <Checkbox
               checked={rememberStudent}
+              className="border-brand data-[state=checked]:bg-brand data-[state=checked]:text-brand-surface focus-visible:ring-brand-accent"
               onCheckedChange={(checked) => onRememberChange(checked === true)}
             />
             <span>记住这次填写的信息</span>
@@ -81,7 +88,7 @@ export function StudentIdentityModal({
             </p>
           )}
 
-          <Button type="submit" className="w-full" size="lg">
+          <Button type="submit" variant="publicPrimary" className="w-full" size="lg">
             确认并开始
           </Button>
         </form>

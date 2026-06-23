@@ -1,7 +1,7 @@
 /**
  * 后台布局：侧栏导航 + 顶栏 + 主内容区
  *
- * - 桌面端（≥lg）：侧栏可展开/收缩，展开 w-60 显示图标+文字，收缩 w-16 仅图标。
+ * - 桌面端（≥lg）：使用两列 grid 承载侧栏和主区域，侧栏宽度变化时主区域同步过渡。
  *   收缩状态持久化到 localStorage。
  * - 移动端（<lg）：抽屉式侧栏 w-60，顶栏 hamburger 按钮控制开合，遮罩点击关闭。
  * 顶栏含主题切换按钮（替代 RA 自动注入的 ToggleThemeButton）。
@@ -14,7 +14,6 @@ import {
     ClipboardList,
     GraduationCap,
     LayoutDashboard,
-    LogOut,
     Menu,
     Moon,
     PanelLeftClose,
@@ -25,6 +24,13 @@ import {
 import {useAuth} from "@/lib/auth";
 import {useThemeMode} from "@/lib/theme";
 import {Button} from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {cn} from "@/lib/utils";
 
 /** 侧栏展开状态持久化 key */
@@ -49,7 +55,7 @@ const navItems = [
     {to: "/admin", label: "概览", icon: LayoutDashboard, end: true},
     {to: "/admin/question-banks", label: "题库管理", icon: BookOpen, end: false},
     {to: "/admin/access-logs", label: "访问日志", icon: ClipboardList, end: false},
-    {to: "/admin/settings", label: "站点设置", icon: Settings, end: false},
+    {to: "/admin/settings", label: "系统设置", icon: Settings, end: false},
 ];
 
 /** 主题切换按钮 */
@@ -67,6 +73,8 @@ export default function AdminLayout() {
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(readSidebarCollapsed);
+    // 用户名为空时仍保留菜单入口，避免会话接口短暂未返回用户名导致操作入口消失。
+    const displayUsername = username?.trim() || "管理员";
 
     const handleLogout = async () => {
         await logout();
@@ -87,7 +95,14 @@ export default function AdminLayout() {
     };
 
     return (
-        <div className="flex min-h-screen overflow-x-hidden bg-background">
+        <div
+            className={cn(
+                "min-h-screen overflow-x-hidden bg-background lg:grid lg:grid-cols-[var(--admin-sidebar-width)_minmax(0,1fr)] lg:transition-[grid-template-columns] lg:duration-200",
+                collapsed
+                    ? "[--admin-sidebar-width:var(--admin-sidebar-collapsed-width)]"
+                    : "[--admin-sidebar-width:var(--admin-sidebar-expanded-width)]",
+            )}
+        >
             {/* 移动端遮罩 */}
             {sidebarOpen && (
                 <div
@@ -97,25 +112,27 @@ export default function AdminLayout() {
                 />
             )}
 
-            {/* 侧栏：桌面固定（可收缩）+ 移动抽屉 */}
+            {/* 侧栏：桌面占位（可收缩）+ 移动抽屉 */}
             <aside
                 className={cn(
-                    "fixed inset-y-0 left-0 z-50 transform border-r bg-card transition-all duration-200 lg:translate-x-0",
-                    collapsed ? "w-16" : "w-60",
+                    "fixed inset-y-0 left-0 z-50 w-[var(--admin-sidebar-expanded-width)] transform border-r bg-card transition-[transform,width] duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
+                    collapsed
+                        ? "lg:w-[var(--admin-sidebar-collapsed-width)]"
+                        : "lg:w-[var(--admin-sidebar-expanded-width)]",
                     sidebarOpen ? "translate-x-0" : "-translate-x-full",
                 )}
             >
                 {/* 标题区：展开时图标 + 标题，收缩时仅图标 */}
                 <div
                     className={cn(
-                        "flex h-14 items-center border-b",
-                        collapsed ? "justify-center px-0" : "gap-2 px-6",
+                        "flex h-14 items-center gap-2 border-b px-6",
+                        collapsed && "lg:justify-center lg:gap-0 lg:px-0",
                     )}
                 >
                     <GraduationCap className="h-6 w-6 shrink-0 text-primary"/>
-                    {!collapsed && (
-                        <span className="text-lg font-bold text-foreground">{SIDEBAR_TITLE}</span>
-                    )}
+                    <span className={cn("text-lg font-bold text-foreground", collapsed && "lg:hidden")}>
+                        {SIDEBAR_TITLE}
+                    </span>
                 </div>
 
                 {/* 导航项 */}
@@ -130,9 +147,8 @@ export default function AdminLayout() {
                             className={({isActive}) =>
                                 cn(
                                     "flex items-center rounded-md text-sm font-medium transition-colors",
-                                    collapsed
-                                        ? "justify-center px-0 py-2.5"
-                                        : "gap-3 px-3 py-2",
+                                    "gap-3 px-3 py-2",
+                                    collapsed && "lg:justify-center lg:gap-0 lg:px-0 lg:py-2.5",
                                     isActive
                                         ? "bg-primary text-primary-foreground"
                                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
@@ -140,7 +156,7 @@ export default function AdminLayout() {
                             }
                         >
                             <item.icon className="h-4 w-4 shrink-0"/>
-                            {!collapsed && item.label}
+                            <span className={cn(collapsed && "lg:hidden")}>{item.label}</span>
                         </NavLink>
                     ))}
                 </nav>
@@ -148,10 +164,7 @@ export default function AdminLayout() {
 
             {/* 主区域 */}
             <div
-                className={cn(
-                    "flex flex-1 flex-col transition-[padding] duration-200",
-                    collapsed ? "lg:pl-16" : "lg:pl-60",
-                )}
+                className="flex min-w-0 flex-col"
             >
                 {/* 顶栏 */}
                 <header
@@ -184,19 +197,33 @@ export default function AdminLayout() {
                     </div>
                     <div className="flex items-center gap-2">
                         <ThemeToggle/>
-                        {username && !collapsed && (
-                            <span className="hidden text-sm text-muted-foreground sm:inline">
-                {username}
-              </span>
-                        )}
-                        <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="登出">
-                            <LogOut className="h-5 w-5"/>
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="max-w-[var(--admin-user-menu-max-width)] px-2"
+                                    aria-label="打开用户菜单"
+                                >
+                                    <span className="truncate">{displayUsername}</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuGroup>
+                                    <DropdownMenuItem onSelect={() => navigate("/admin/settings")}>
+                                        系统设置
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => void handleLogout()}>
+                                        退出登录
+                                    </DropdownMenuItem>
+                                </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </header>
 
                 {/* 内容区 */}
-                <main className="flex-1 p-4 lg:p-6">
+                <main className="min-w-0 flex-1 p-4 lg:p-6">
                     <Outlet/>
                 </main>
             </div>

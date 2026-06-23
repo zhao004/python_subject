@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy.dialects import mysql
 
-from app.config import AppConfigError, MySQLSettings, load_mysql_settings
+from app.config import AppConfigError, MySQLSettings, load_admin_settings, load_mysql_settings
 from app.database import build_mysql_url, validate_mysql_token
 from app.models import ScoreRecord
 from app.schema_sync import collect_column_sync_actions, expected_nullable, should_modify_column
@@ -20,12 +20,26 @@ MYSQL_ENV_NAMES = (
     "MYSQL_CHARSET",
     "MYSQL_COLLATION",
 )
+ADMIN_ENV_NAMES = (
+    "ADMIN_USERNAME",
+    "ADMIN_PASSWORD",
+    "ADMIN_SESSION_SECRET",
+    "ADMIN_COOKIE_SECURE",
+)
+TEST_ADMIN_SECRET = "test-session-secret-for-admin-1234567890"
 
 
 def clear_mysql_env() -> None:
     """清理测试写入的 MySQL 环境变量，避免污染其他用例。"""
 
     for name in MYSQL_ENV_NAMES:
+        os.environ.pop(name, None)
+
+
+def clear_admin_env() -> None:
+    """清理测试写入的后台管理员环境变量，避免污染其他用例。"""
+
+    for name in ADMIN_ENV_NAMES:
         os.environ.pop(name, None)
 
 
@@ -84,6 +98,115 @@ def test_load_mysql_settings_requires_database_name(tmp_path: Path, monkeypatch:
             load_mysql_settings(env_file)
     finally:
         clear_mysql_env()
+
+
+def test_load_admin_settings_defaults_cookie_secure_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """未显式开启时 Cookie Secure 默认关闭，保证本地 HTTP 开发可登录。"""
+
+    for name in ADMIN_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "ADMIN_USERNAME=admin",
+                "ADMIN_PASSWORD=secret",
+                f"ADMIN_SESSION_SECRET={TEST_ADMIN_SECRET}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        settings = load_admin_settings(env_file)
+    finally:
+        clear_admin_env()
+
+    assert settings.username == "admin"
+    assert settings.cookie_secure is False
+
+
+def test_load_admin_settings_parses_cookie_secure_true(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """生产环境可通过 ADMIN_COOKIE_SECURE=true 开启 Secure Cookie。"""
+
+    for name in ADMIN_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "ADMIN_USERNAME=admin",
+                "ADMIN_PASSWORD=secret",
+                f"ADMIN_SESSION_SECRET={TEST_ADMIN_SECRET}",
+                "ADMIN_COOKIE_SECURE=true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        settings = load_admin_settings(env_file)
+    finally:
+        clear_admin_env()
+
+    assert settings.cookie_secure is True
+
+
+def test_load_admin_settings_rejects_short_session_secret(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """过短签名密钥应在启动配置阶段被拒绝，避免弱会话签名上线。"""
+
+    for name in ADMIN_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "ADMIN_USERNAME=admin",
+                "ADMIN_PASSWORD=secret",
+                "ADMIN_SESSION_SECRET=too-short",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        with pytest.raises(AppConfigError, match="ADMIN_SESSION_SECRET"):
+            load_admin_settings(env_file)
+    finally:
+        clear_admin_env()
+
+
+def test_load_admin_settings_rejects_invalid_cookie_secure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """非法布尔文本应抛出明确配置错误，避免误以为 Secure Cookie 已开启。"""
+
+    for name in ADMIN_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "ADMIN_USERNAME=admin",
+                "ADMIN_PASSWORD=secret",
+                f"ADMIN_SESSION_SECRET={TEST_ADMIN_SECRET}",
+                "ADMIN_COOKIE_SECURE=maybe",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        with pytest.raises(AppConfigError, match="ADMIN_COOKIE_SECURE"):
+            load_admin_settings(env_file)
+    finally:
+        clear_admin_env()
 
 
 def test_build_mysql_url_preserves_special_password() -> None:

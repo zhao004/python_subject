@@ -6,7 +6,7 @@
  * 保留学号 9 位校验 + 分数留空自动计算逻辑。
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";

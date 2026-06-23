@@ -20,11 +20,14 @@ MIN_SLUG_LENGTH = 2
 MAX_SLUG_LENGTH = 60
 ADMIN_SESSION_COOKIE = "quiz_admin_session"
 ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60
+ADMIN_SESSION_SECRET_MIN_LENGTH = 32
 SUPPORTED_SUBMISSION_STYLES = ("classic", "slate", "paper")
 DEFAULT_MYSQL_PORT = 3306
 DEFAULT_MYSQL_CHARSET = "utf8mb4"
 DEFAULT_MYSQL_COLLATION = "utf8mb4_unicode_ci"
 ENV_FILE = ".env"
+BOOLEAN_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+BOOLEAN_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 
 
 class AppConfigError(RuntimeError):
@@ -51,12 +54,13 @@ class MySQLSettings:
 class AdminSettings:
     """后台管理员配置。
 
-    管理员账号、密码和会话签名密钥全部来自环境变量，避免在代码中固化凭据。
+    管理员账号、密码、会话签名密钥和 Cookie 安全策略全部来自环境变量，避免在代码中固化凭据。
     """
 
     username: str
     password: str
     session_secret: str
+    cookie_secure: bool = False
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,31 @@ def read_required_env(name: str) -> str:
     if not value:
         raise AppConfigError(f"缺少必填环境变量：{name}")
     return value
+
+
+def read_bool_env(name: str, default: bool = False) -> bool:
+    """读取布尔环境变量。
+
+    Args:
+        name: 环境变量名称。
+        default: 未配置或配置为空时使用的默认值。
+
+    Returns:
+        解析后的布尔值。
+
+    Raises:
+        AppConfigError: 变量值不是受支持的布尔文本时触发。
+    """
+
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    normalized_value = raw_value.strip().lower()
+    if normalized_value in BOOLEAN_TRUE_VALUES:
+        return True
+    if normalized_value in BOOLEAN_FALSE_VALUES:
+        return False
+    raise AppConfigError(f"{name} 必须是布尔值：true/false、1/0、yes/no 或 on/off")
 
 
 def read_mysql_port() -> int:
@@ -144,10 +173,16 @@ def load_admin_settings(env_file: str | Path = ENV_FILE) -> AdminSettings:
     """
 
     load_app_env(env_file)
+    session_secret = read_required_env("ADMIN_SESSION_SECRET")
+    if len(session_secret) < ADMIN_SESSION_SECRET_MIN_LENGTH:
+        raise AppConfigError(
+            f"ADMIN_SESSION_SECRET 长度不能少于 {ADMIN_SESSION_SECRET_MIN_LENGTH} 个字符"
+        )
     return AdminSettings(
         username=read_required_env("ADMIN_USERNAME"),
         password=read_required_env("ADMIN_PASSWORD"),
-        session_secret=read_required_env("ADMIN_SESSION_SECRET"),
+        session_secret=session_secret,
+        cookie_secure=read_bool_env("ADMIN_COOKIE_SECURE", default=False),
     )
 
 
@@ -164,4 +199,3 @@ def load_ip_region_settings(env_file: str | Path = ENV_FILE) -> IpRegionSettings
     load_app_env(env_file)
     xdb_path = os.getenv("IP2REGION_XDB_PATH", "").strip()
     return IpRegionSettings(xdb_path=xdb_path or None)
-

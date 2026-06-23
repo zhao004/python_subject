@@ -1,4 +1,5 @@
 import type {Config} from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 /**
  * Tailwind 配置：双设计系统（公开端暖色 + 后台冷蓝暗色）
@@ -113,7 +114,7 @@ const config: Config = {
             },
         },
     },
-    plugins: [require("tailwindcss-animate")],
+    plugins: [tailwindcssAnimate],
 };
 
 export default config;

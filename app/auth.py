@@ -94,7 +94,7 @@ def authenticate_admin(username: str, password: str) -> AdminSettings:
     return settings
 
 
-def set_admin_cookie(response: Response, token: str) -> None:
+def set_admin_cookie(response: Response, token: str, settings: AdminSettings) -> None:
     """写入后台管理员会话 Cookie。"""
 
     response.set_cookie(
@@ -102,6 +102,7 @@ def set_admin_cookie(response: Response, token: str) -> None:
         value=token,
         max_age=ADMIN_SESSION_TTL_SECONDS,
         httponly=True,
+        secure=settings.cookie_secure,
         samesite="lax",
     )
 

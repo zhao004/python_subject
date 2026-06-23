@@ -32,7 +32,7 @@ import type {
   ScoreSubmissionResult,
   StudentForm,
 } from "./types";
-import { HomePage, LoadingPage } from "./components/Common";
+import { HomePage } from "./components/Common";
 import { QuizPage } from "./components/QuizPage";
 import { LeaderboardPage } from "./components/Leaderboard";
 import { StudentIdentityModal } from "./components/StudentIdentityModal";
@@ -40,6 +40,23 @@ import { StudentIdentityModal } from "./components/StudentIdentityModal";
 interface PublicAppProps {
   route: RouteInfo;
   navigateTo: (path: string, replace?: boolean) => void;
+}
+
+const PUBLIC_STYLE_CLASS_BY_KEY = {
+  classic: "public-style-classic",
+  slate: "public-style-slate",
+  paper: "public-style-paper",
+} as const;
+
+/** 将后端主题风格值转换为公开页样式类，历史脏值统一回退到经典风格。 */
+function resolvePublicStyleClass(value: unknown): string {
+  if (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(PUBLIC_STYLE_CLASS_BY_KEY, value)
+  ) {
+    return PUBLIC_STYLE_CLASS_BY_KEY[value as keyof typeof PUBLIC_STYLE_CLASS_BY_KEY];
+  }
+  return PUBLIC_STYLE_CLASS_BY_KEY.classic;
 }
 
 /**
@@ -79,7 +96,7 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
   const score = quiz ? Math.round(matchedCount * quiz.points_per_pair) : 0;
   const totalPairs = quiz?.total_pairs ?? 0;
   const styleClass = quiz
-    ? `public-style-${quiz.question_bank.submission_style}`
+    ? resolvePublicStyleClass(quiz.question_bank.submission_style)
     : "public-style-classic";
   const shouldShowIdentityModal = route.page === "quiz" && quiz !== null && !isIdentityConfirmed;
 
@@ -431,6 +448,7 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
           errorMessage={identityError}
           form={studentForm}
           rememberStudent={rememberStudent}
+          styleClass={styleClass}
           onConfirm={confirmStudentIdentity}
           onFormChange={updateStudentForm}
           onRememberChange={setRememberStudent}

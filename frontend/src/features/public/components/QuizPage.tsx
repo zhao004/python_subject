@@ -164,13 +164,14 @@ export function QuizPage({
 
             {/* 操作按钮区 */}
             <div className="mt-4 grid gap-2.5 sm:flex sm:justify-end">
-              <Button variant="secondary" onClick={onResetGame}>
+              <Button variant="publicSecondary" onClick={onResetGame}>
                 重新随机排序
               </Button>
-              <Button variant="secondary" onClick={onNavigateLeaderboard}>
+              <Button variant="publicSecondary" onClick={onNavigateLeaderboard}>
                 查看排行榜
               </Button>
               <Button
+                variant="publicPrimary"
                 disabled={isSubmitting || quiz.total_pairs === 0}
                 onClick={onSubmitScore}
               >

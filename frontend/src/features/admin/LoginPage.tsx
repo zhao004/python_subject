@@ -2,14 +2,19 @@
  * 后台登录页
  *
  * 替代 react-admin LoginPage + MUI 表单。
- * 保留记住密码逻辑（localStorage key: quizAdminCredentials:v1）。
+ * 保留记住账号密码逻辑（localStorage key: quizAdminCredentials:v1）。
  */
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth, readRememberedCredentials, saveRememberedCredentials, clearRememberedCredentials } from "@/lib/auth";
+import {
+  clearRememberedCredentials,
+  readRememberedCredentials,
+  saveRememberedCredentials,
+  useAuth,
+} from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +22,29 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+function resolvePostLoginPath(state: unknown): string {
+  if (!state || typeof state !== "object") {
+    return "/admin";
+  }
+  const from = (state as { from?: unknown }).from;
+  if (!from || typeof from !== "object") {
+    return "/admin";
+  }
+  const locationState = from as { pathname?: unknown; search?: unknown; hash?: unknown };
+  const pathname = typeof locationState.pathname === "string" ? locationState.pathname : "";
+  if (!pathname.startsWith("/admin") || pathname === "/admin/login") {
+    return "/admin";
+  }
+  const search = typeof locationState.search === "string" ? locationState.search : "";
+  const hash = typeof locationState.hash === "string" ? locationState.hash : "";
+  return `${pathname}${search}${hash}`;
+}
+
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const redirectPath = resolvePostLoginPath(location.state);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -31,11 +56,11 @@ export default function LoginPage() {
   /** 已认证则跳转后台首页 */
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/admin", { replace: true });
+      navigate(redirectPath, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, redirectPath]);
 
-  /** 恢复记住的凭据 */
+  /** 恢复本机保存的账号密码；密码为空时兼容旧版只记住账号的数据。 */
   useEffect(() => {
     const saved = readRememberedCredentials();
     if (saved) {
@@ -63,7 +88,7 @@ export default function LoginPage() {
         clearRememberedCredentials();
       }
       toast.success("登录成功");
-      navigate("/admin", { replace: true });
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : "登录失败";
       setError(message);

@@ -121,6 +121,11 @@
   --border: 220 13% 91%;
   --input: 220 13% 91%;
   --ring: 221 83% 53%;
+  /* 后台布局尺寸 token：统一侧栏宽度与顶栏用户名菜单宽度。 */
+  --admin-sidebar-expanded-width: 15rem;
+  --admin-sidebar-collapsed-width: 4rem;
+  --admin-sidebar-width: var(--admin-sidebar-expanded-width);
+  --admin-user-menu-max-width: 12rem;
 }
 
 .dark {

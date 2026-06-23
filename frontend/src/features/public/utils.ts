@@ -26,9 +26,15 @@ export function readRoute(pathname: string = window.location.pathname): RouteInf
   }
   const publicMatch = path.match(/^\/b\/([^/]+)(?:\/(leaderboard))?$/);
   if (publicMatch) {
+    let slug = "";
+    try {
+      slug = decodeURIComponent(publicMatch[1]);
+    } catch {
+      return { page: "home", path };
+    }
     return {
       page: publicMatch[2] === "leaderboard" ? "leaderboard" : "quiz",
-      slug: decodeURIComponent(publicMatch[1]),
+      slug,
       path,
     };
   }

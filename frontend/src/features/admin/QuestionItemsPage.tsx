@@ -150,6 +150,7 @@ function buildPayload(
     name: bank.name,
     slug: bank.slug,
     description: bank.description ?? "",
+    announcement: bank.announcement ?? "",
     is_active: bank.is_active,
     leaderboard_limit: bank.leaderboard_limit,
     submission_style: bank.submission_style,

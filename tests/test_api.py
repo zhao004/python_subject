@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.config import ADMIN_SESSION_COOKIE
 from app.factory import create_app
 from app.models import QuestionBank, QuestionItem, SiteSetting
 from app.time_utils import storage_now
@@ -15,7 +16,7 @@ from app.time_utils import storage_now
 TEST_BANK_SLUG = "english-pairs"
 TEST_ADMIN_USERNAME = "admin"
 TEST_ADMIN_PASSWORD = "secret"
-TEST_ADMIN_SECRET = "test-session-secret"
+TEST_ADMIN_SECRET = "test-session-secret-for-admin-1234567890"
 
 
 @pytest.fixture()
@@ -83,6 +84,7 @@ def set_admin_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ADMIN_USERNAME", TEST_ADMIN_USERNAME)
     monkeypatch.setenv("ADMIN_PASSWORD", TEST_ADMIN_PASSWORD)
     monkeypatch.setenv("ADMIN_SESSION_SECRET", TEST_ADMIN_SECRET)
+    monkeypatch.setenv("ADMIN_COOKIE_SECURE", "false")
 
 
 def assert_utc8_datetime(value: str) -> None:
@@ -282,6 +284,7 @@ def test_admin_login_and_question_bank_crud(client: TestClient, monkeypatch: pyt
     assert create_response.status_code == 201
     created_bank = create_response.json()
     assert created_bank["item_count"] == 2
+    assert created_bank["submission_style"] == "paper"
 
     settings_response = client.put(
         "/api/admin/site-settings",
@@ -292,6 +295,81 @@ def test_admin_login_and_question_bank_crud(client: TestClient, monkeypatch: pyt
 
     delete_response = client.delete(f"/api/admin/question-banks/{created_bank['id']}")
     assert delete_response.status_code == 204
+
+
+def test_admin_login_sets_session_cookie_attributes(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """后台登录 Cookie 应固定 HttpOnly 和 SameSite=Lax，降低脚本读取与跨站请求风险。"""
+
+    set_admin_env(monkeypatch)
+
+    login_response = client.post(
+        "/api/admin/login",
+        json={"username": TEST_ADMIN_USERNAME, "password": TEST_ADMIN_PASSWORD},
+    )
+
+    cookie_header = login_response.headers.get("set-cookie", "")
+    normalized_cookie_header = cookie_header.lower()
+    assert login_response.status_code == 200
+    assert f"{ADMIN_SESSION_COOKIE}=" in cookie_header
+    assert "httponly" in normalized_cookie_header
+    assert "samesite=lax" in normalized_cookie_header
+
+
+def test_admin_login_cookie_supports_secure_attribute(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """开启 ADMIN_COOKIE_SECURE 后，登录响应应写入 Secure Cookie 属性。"""
+
+    set_admin_env(monkeypatch)
+    monkeypatch.setenv("ADMIN_COOKIE_SECURE", "true")
+
+    login_response = client.post(
+        "/api/admin/login",
+        json={"username": TEST_ADMIN_USERNAME, "password": TEST_ADMIN_PASSWORD},
+    )
+
+    cookie_header = login_response.headers.get("set-cookie", "")
+    assert login_response.status_code == 200
+    assert "secure" in cookie_header.lower()
+
+
+def test_admin_question_bank_update_preserves_theme_style_and_announcement(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """题库更新应保留主题风格与公告，并在公开接口中同步回显。"""
+
+    _admin_login(client, monkeypatch)
+    bank_id = client.get("/api/admin/question-banks").json()["entries"][0]["id"]
+
+    update_response = client.put(
+        f"/api/admin/question-banks/{bank_id}",
+        json={
+            "name": "英语配对",
+            "slug": TEST_BANK_SLUG,
+            "description": "更新后的描述",
+            "is_active": True,
+            "leaderboard_limit": 8,
+            "submission_style": "slate",
+            "announcement": "主题风格已更新",
+            "items": [
+                {"left_text": "word-1", "right_text": "释义-1"},
+                {"left_text": "word-2", "right_text": "释义-2"},
+            ],
+        },
+    )
+
+    assert update_response.status_code == 200
+    updated_bank = update_response.json()
+    assert updated_bank["submission_style"] == "slate"
+    assert updated_bank["announcement"] == "主题风格已更新"
+
+    quiz_response = client.get(f"/api/public/question-banks/{TEST_BANK_SLUG}/quiz")
+    assert quiz_response.status_code == 200
+    quiz_body = quiz_response.json()
+    assert quiz_body["question_bank"]["submission_style"] == "slate"
+    assert quiz_body["question_bank"]["announcement"] == "主题风格已更新"
 
 
 def test_admin_can_crud_leaderboard_records(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

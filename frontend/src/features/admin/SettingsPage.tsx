@@ -1,5 +1,5 @@
 /**
- * 站点设置页
+ * 系统设置页
  *
  * 替代原 react-admin SettingsPage.tsx。
  * 默认题库下拉选择 + 保存。
@@ -83,7 +83,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">站点设置</h1>
+      <h1 className="text-2xl font-bold">系统设置</h1>
 
       <Card>
         <CardHeader>
