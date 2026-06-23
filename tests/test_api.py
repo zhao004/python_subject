@@ -351,7 +351,7 @@ def test_admin_question_bank_update_preserves_theme_style_and_announcement(
             "description": "更新后的描述",
             "is_active": True,
             "leaderboard_limit": 8,
-            "submission_style": "slate",
+            "submission_style": "paper",
             "announcement": "主题风格已更新",
             "items": [
                 {"left_text": "word-1", "right_text": "释义-1"},
@@ -362,13 +362,17 @@ def test_admin_question_bank_update_preserves_theme_style_and_announcement(
 
     assert update_response.status_code == 200
     updated_bank = update_response.json()
-    assert updated_bank["submission_style"] == "slate"
+    assert updated_bank["submission_style"] == "paper"
     assert updated_bank["announcement"] == "主题风格已更新"
+
+    detail_response = client.get(f"/api/admin/question-banks/{bank_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["submission_style"] == "paper"
 
     quiz_response = client.get(f"/api/public/question-banks/{TEST_BANK_SLUG}/quiz")
     assert quiz_response.status_code == 200
     quiz_body = quiz_response.json()
-    assert quiz_body["question_bank"]["submission_style"] == "slate"
+    assert quiz_body["question_bank"]["submission_style"] == "paper"
     assert quiz_body["question_bank"]["announcement"] == "主题风格已更新"
 
 

@@ -56,6 +56,7 @@ const DEFAULT_SUBMISSION_STYLE: SubmissionStyleKey = "classic";
 
 /** 有效主题风格值集合，用于校验后端返回值。 */
 const VALID_STYLES = new Set<SubmissionStyleKey>(STYLE_CHOICES.map((c) => c.value));
+const INVALID_STYLE_MESSAGE = "主题风格设置无效，请重新选择";
 
 /** 表单值类型（items 保留用于整体提交，不在弹窗中编辑） */
 interface BankFormValues {
@@ -81,12 +82,30 @@ const DEFAULT_VALUES: BankFormValues = {
   items: [],
 };
 
-/** 归一化主题风格，避免 Select 收到 undefined、空字符串或历史非法值后显示为空。 */
-function normalizeSubmissionStyle(value: unknown): SubmissionStyleKey {
+/** 解析主题风格，非法值返回 null，避免保存时静默覆盖为经典风格。 */
+function parseSubmissionStyle(value: unknown): SubmissionStyleKey | null {
   if (typeof value === "string" && VALID_STYLES.has(value as SubmissionStyleKey)) {
     return value as SubmissionStyleKey;
   }
+  return null;
+}
+
+/** 归一化主题风格，仅用于 Select 展示，保存链路必须走严格校验。 */
+function normalizeSubmissionStyle(value: unknown): SubmissionStyleKey {
+  const parsedStyle = parseSubmissionStyle(value);
+  if (parsedStyle) {
+    return parsedStyle;
+  }
   return DEFAULT_SUBMISSION_STYLE;
+}
+
+/** 保存前严格校验主题风格，避免异常值被默认值吞掉。 */
+function requireSubmissionStyle(value: unknown): SubmissionStyleKey {
+  const parsedStyle = parseSubmissionStyle(value);
+  if (!parsedStyle) {
+    throw new Error(INVALID_STYLE_MESSAGE);
+  }
+  return parsedStyle;
 }
 
 /** 将题库数据转为表单值 */
@@ -119,7 +138,7 @@ function transformPayload(values: BankFormValues): QuestionBankPayload {
     announcement: values.announcement.trim(),
     is_active: values.is_active,
     leaderboard_limit: Number(values.leaderboard_limit),
-    submission_style: normalizeSubmissionStyle(values.submission_style),
+    submission_style: requireSubmissionStyle(values.submission_style),
     items: values.items
       .map((item) => ({
         left_text: item.left_text.trim(),
@@ -158,6 +177,8 @@ export default function QuestionBankDialog({
     handleSubmit,
     reset,
     setValue,
+    setError,
+    clearErrors,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<BankFormValues>({
@@ -173,17 +194,31 @@ export default function QuestionBankDialog({
     }
     if (bank) {
       reset(bankToForm(bank));
+      if (!parseSubmissionStyle(bank.submission_style)) {
+        setError("submission_style", {
+          type: "validate",
+          message: "题库主题风格数据异常，请重新选择并保存",
+        });
+      }
     }
-  }, [bank, isEdit, reset, open]);
+  }, [bank, isEdit, reset, setError, open]);
 
   /** 创建/更新 mutation */
   const mutation = useMutation({
     mutationFn: async (values: BankFormValues) => {
       const payload = transformPayload(values);
-      if (isEdit && bankId !== null) {
-        return updateQuestionBank(bankId, payload);
+      const response =
+        isEdit && bankId !== null
+          ? await updateQuestionBank(bankId, payload)
+          : await createQuestionBank(payload);
+      if (parseSubmissionStyle(response.submission_style) !== payload.submission_style) {
+        throw new Error("主题风格未保存成功，请刷新页面后重试");
       }
-      return createQuestionBank(payload);
+      const confirmedBank = await fetchQuestionBank(response.id);
+      if (parseSubmissionStyle(confirmedBank.submission_style) !== payload.submission_style) {
+        throw new Error("主题风格未保存成功，请刷新页面后重试");
+      }
+      return confirmedBank;
     },
     onSuccess: (data) => {
       const normalizedData = {
@@ -191,7 +226,6 @@ export default function QuestionBankDialog({
         announcement: data.announcement ?? "",
         submission_style: normalizeSubmissionStyle(data.submission_style),
       };
-      // 编辑模式：先写入规范化详情，再让单条详情失效；下次打开时以服务端最新数据为准。
       if (isEdit && bankId !== null) {
         queryClient.setQueryData(["admin-question-bank", bankId], normalizedData);
         queryClient.invalidateQueries({ queryKey: ["admin-question-bank", bankId] });
@@ -219,6 +253,7 @@ export default function QuestionBankDialog({
   };
 
   const slugValue = watch("slug");
+  const isSaving = isSubmitting || mutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -239,7 +274,13 @@ export default function QuestionBankDialog({
           </div>
         ) : (
           <form
-            onSubmit={handleSubmit((values) => mutation.mutate(values))}
+            onSubmit={handleSubmit(async (values) => {
+              try {
+                await mutation.mutateAsync(values);
+              } catch {
+                // mutation.onError 已统一给出用户提示，这里只阻止未处理的 Promise 拒绝。
+              }
+            })}
             className="space-y-6"
           >
             {/* 基本信息 */}
@@ -318,12 +359,28 @@ export default function QuestionBankDialog({
                   <Controller
                     control={control}
                     name="submission_style"
+                    rules={{
+                      validate: (value) =>
+                        parseSubmissionStyle(value) ? true : INVALID_STYLE_MESSAGE,
+                    }}
                     render={({ field }) => (
                       <Select
                         value={normalizeSubmissionStyle(field.value)}
-                        onValueChange={(value) =>
-                          field.onChange(normalizeSubmissionStyle(value))
-                        }
+                        onValueChange={(value) => {
+                          const nextStyle = parseSubmissionStyle(value);
+                          if (!nextStyle) {
+                            setError("submission_style", {
+                              type: "validate",
+                              message: INVALID_STYLE_MESSAGE,
+                            });
+                            return;
+                          }
+                          setValue("submission_style", nextStyle, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          clearErrors("submission_style");
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="请选择主题风格" />
@@ -340,6 +397,11 @@ export default function QuestionBankDialog({
                       </Select>
                     )}
                   />
+                  {errors.submission_style && (
+                    <p className="text-sm text-destructive">
+                      {errors.submission_style.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -369,8 +431,8 @@ export default function QuestionBankDialog({
               >
                 取消
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "保存中..." : isEdit ? "保存" : "创建"}
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "保存中..." : isEdit ? "保存" : "创建"}
               </Button>
             </DialogFooter>
           </form>
