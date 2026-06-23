@@ -42,16 +42,25 @@ const ReactECharts = lazy(() => import("echarts-for-react"));
 /** ECharts 渲染配置（模块级常量，避免每次渲染创建新对象触发组件重建） */
 const CHART_OPTS = { renderer: "canvas" as const };
 
-/** 趋势图配色 */
-const CHART_COLORS = [
-  "#0070f3",
-  "#7928ca",
-  "#f5a623",
-  "#30a46c",
-  "#e5484d",
-  "#f81ce5",
-  "#50e3c2",
-];
+/** 趋势图主题：避免暗色模式下出现低对比或过亮的默认色。 */
+const CHART_THEMES = {
+  light: {
+    colors: ["#0284c7", "#d97706", "#059669", "#dc2626", "#ea580c", "#0d9488", "#65a30d"],
+    text: "#52525b",
+    axis: "#d4d4d8",
+    split: "#e5e7eb",
+    tooltipBg: "#ffffff",
+    tooltipBorder: "#d4d4d8",
+  },
+  dark: {
+    colors: ["#22d3ee", "#fbbf24", "#34d399", "#fb7185", "#fdba74", "#2dd4bf", "#a3e635"],
+    text: "#cbd5e1",
+    axis: "#52525b",
+    split: "#27272a",
+    tooltipBg: "#0f172a",
+    tooltipBorder: "#334155",
+  },
+} as const;
 
 /** 指标卡 */
 function MetricCard({
@@ -120,6 +129,7 @@ export default function Dashboard() {
   const hasTrendSeries = (trendData?.series?.length ?? 0) > 0;
   const trendErrorMessage =
     trendError instanceof Error ? trendError.message : "提交趋势读取失败";
+  const chartTheme = isDark ? CHART_THEMES.dark : CHART_THEMES.light;
 
   /** ECharts 配置（useMemo 避免每次渲染重建对象） */
   const chartOption = useMemo(
@@ -128,12 +138,17 @@ export default function Dashboard() {
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "line" },
+        backgroundColor: chartTheme.tooltipBg,
+        borderColor: chartTheme.tooltipBorder,
+        borderWidth: 1,
+        textStyle: { color: chartTheme.text },
       },
       legend: {
         type: "scroll",
         top: 0,
         data: trendData?.series?.map((b) => b.bank_name) ?? [],
-        textStyle: { color: isDark ? "#a1a1aa" : "#666" },
+        textStyle: { color: chartTheme.text },
+        pageTextStyle: { color: chartTheme.text },
       },
       grid: {
         left: "3%",
@@ -146,16 +161,18 @@ export default function Dashboard() {
         type: "category",
         boundaryGap: false,
         data: trendData?.dates ?? [],
-        axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
-        axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
+        axisLine: { lineStyle: { color: chartTheme.axis } },
+        axisTick: { lineStyle: { color: chartTheme.axis } },
+        axisLabel: { color: chartTheme.text },
       },
       yAxis: {
         type: "value",
         min: 0,
         minInterval: 1,
-        axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
-        axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
-        splitLine: { lineStyle: { color: isDark ? "#27272a" : "#eee" } },
+        axisLine: { lineStyle: { color: chartTheme.axis } },
+        axisTick: { lineStyle: { color: chartTheme.axis } },
+        axisLabel: { color: chartTheme.text },
+        splitLine: { lineStyle: { color: chartTheme.split } },
       },
       series:
         trendData?.series?.map((bank, i) => ({
@@ -168,13 +185,13 @@ export default function Dashboard() {
           data: bank.data,
           lineStyle: {
             width: 2,
-            color: CHART_COLORS[i % CHART_COLORS.length],
+            color: chartTheme.colors[i % chartTheme.colors.length],
           },
-          itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length] },
+          itemStyle: { color: chartTheme.colors[i % chartTheme.colors.length] },
           emphasis: { focus: "series" },
         })) ?? [],
     }),
-    [trendData, isDark],
+    [trendData, chartTheme],
   );
 
   return (

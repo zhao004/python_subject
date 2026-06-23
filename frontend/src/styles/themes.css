@@ -105,6 +105,7 @@
 
 /* ==================== 后台 shadcn Token（冷蓝色调） ==================== */
 :root {
+  color-scheme: light;
   --background: 0 0% 100%;
   --foreground: 224 71% 4%;
   --card: 0 0% 100%;
@@ -132,38 +133,40 @@
 }
 
 .dark {
-  --background: 224 71% 4%;
-  --foreground: 210 20% 98%;
-  --card: 224 71% 6%;
-  --card-foreground: 210 20% 98%;
-  --popover: 224 71% 6%;
-  --popover-foreground: 210 20% 98%;
-  --primary: 217 91% 60%;
-  --primary-foreground: 222 47% 11%;
-  --secondary: 215 28% 17%;
-  --secondary-foreground: 210 20% 98%;
-  --muted: 215 28% 17%;
-  --muted-foreground: 218 11% 65%;
-  --accent-hsl: 215 28% 17%;
-  --accent-hsl-foreground: 210 20% 98%;
-  --destructive: 0 63% 31%;
-  --destructive-foreground: 210 20% 98%;
-  --border: 215 28% 17%;
-  --input: 215 28% 17%;
-  --ring: 217 91% 60%;
+  color-scheme: dark;
+  --background: 220 18% 7%;
+  --foreground: 220 20% 98%;
+  --card: 220 16% 10%;
+  --card-foreground: 220 20% 98%;
+  --popover: 220 16% 10%;
+  --popover-foreground: 220 20% 98%;
+  --primary: 188 88% 53%;
+  --primary-foreground: 220 38% 8%;
+  --secondary: 220 12% 15%;
+  --secondary-foreground: 220 20% 98%;
+  --muted: 220 12% 13%;
+  --muted-foreground: 220 10% 70%;
+  --accent-hsl: 220 12% 15%;
+  --accent-hsl-foreground: 220 20% 98%;
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 12% 22%;
+  --input: 220 12% 22%;
+  --ring: 188 88% 53%;
 }
 
 /* 深色模式下 body 背景与文字色覆盖
- * 公开端暖色渐变在后台深色模式下需替换为冷调暗色，
+ * 公开端暖色渐变在后台深色模式下需替换为高对比暗色，
  * 否则 overscroll / 间隙区域暴露浅色背景。
  * 注意：ThemeProvider 卸载时会移除 .dark 类，公开端不受影响。 */
 .dark body {
-  color: hsl(210 20% 98%);
+  color: hsl(var(--foreground));
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(180deg, hsl(224 71% 5%) 0%, hsl(224 71% 4%) 52%, hsl(224 71% 3%) 100%);
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(180deg, hsl(220 18% 8%) 0%, hsl(220 18% 7%) 52%, hsl(220 22% 5%) 100%);
   background-size: 1.6rem 1.6rem, 1.6rem 1.6rem, auto;
+  background-color: hsl(var(--background));
 }
 
 /* ==================== 全局基础样式 ==================== */
@@ -174,6 +177,7 @@
 
   html {
     min-width: 20rem;
+    background-color: hsl(var(--background));
   }
 
   body {
@@ -186,6 +190,7 @@
       linear-gradient(180deg, rgba(20, 63, 62, 0.05) 1px, transparent 1px),
       linear-gradient(180deg, #fafcf9 0%, var(--page-bg) 52%, #e1e9e4 100%);
     background-size: 1.6rem 1.6rem, 1.6rem 1.6rem, auto;
+    background-color: #fafcf9;
     font-family:
       "Inter",
       "PingFang SC",

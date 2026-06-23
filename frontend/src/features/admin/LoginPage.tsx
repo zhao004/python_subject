@@ -98,10 +98,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <Card className="w-full max-w-md border-border/80 bg-card/95 shadow-[0_1.5rem_3.5rem_rgba(0,0,0,0.24)]">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 dark:border-primary/30 dark:bg-primary/15">
             <Lock className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">后台登录</CardTitle>
