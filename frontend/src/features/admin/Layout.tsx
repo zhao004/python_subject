@@ -19,6 +19,7 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
     Settings,
+    ShieldBan,
     Sun,
 } from "lucide-react";
 import {useAuth} from "@/lib/auth";
@@ -55,6 +56,7 @@ const navItems = [
     {to: "/admin", label: "概览", icon: LayoutDashboard, end: true},
     {to: "/admin/question-banks", label: "题库管理", icon: BookOpen, end: false},
     {to: "/admin/access-logs", label: "访问日志", icon: ClipboardList, end: false},
+    {to: "/admin/ip-blacklist", label: "IP 黑名单", icon: ShieldBan, end: false},
     {to: "/admin/settings", label: "系统设置", icon: Settings, end: false},
 ];
 

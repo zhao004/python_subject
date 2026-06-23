@@ -30,6 +30,7 @@ import QuestionItemsPage from "./QuestionItemsPage";
 import BankLeaderboard from "./BankLeaderboard";
 import BankLogs from "./BankLogs";
 import AccessLogs from "./AccessLogs";
+import IpBlacklistPage from "./IpBlacklistPage";
 import SettingsPage from "./SettingsPage";
 
 /** 认证守卫：未认证时重定向到登录页 */
@@ -79,6 +80,7 @@ function AdminRoutes() {
         <Route path="question-banks/:id/leaderboard" element={<BankLeaderboard />} />
         <Route path="question-banks/:id/logs" element={<BankLogs />} />
         <Route path="access-logs" element={<AccessLogs />} />
+        <Route path="ip-blacklist" element={<IpBlacklistPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/admin" replace />} />

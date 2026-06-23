@@ -1,6 +1,7 @@
 """API 输入输出模型。"""
 
 from datetime import datetime
+import ipaddress
 import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -27,6 +28,7 @@ STUDENT_ID_PATTERN = re.compile(rf"^\d{{{STUDENT_ID_LENGTH}}}$")
 SLUG_PATTERN = re.compile(r"^[A-Za-z0-9_-]{3,32}$")
 MAX_ANNOUNCEMENT_LENGTH = 1000
 MAX_BATCH_DELETE_IDS = 500
+MAX_IP_BLACKLIST_REASON_LENGTH = 255
 
 
 class TrimmedModel(BaseModel):
@@ -194,6 +196,7 @@ class SubmissionLogItem(BaseModel):
     total_pairs: int
     score: int
     elapsed_seconds: int
+    ip_address: str
     is_manual: bool
     submitted_at: datetime
 
@@ -380,6 +383,39 @@ class AccessLogListResponse(BaseModel):
 
     total: int
     entries: list[AccessLogResponse]
+
+
+class IpBlacklistPayload(TrimmedModel):
+    """IP 黑名单创建请求。"""
+
+    ip_address: str = Field(min_length=1, max_length=45)
+    reason: str = Field(default="", max_length=MAX_IP_BLACKLIST_REASON_LENGTH)
+
+    @field_validator("ip_address")
+    @classmethod
+    def validate_ip_address(cls, ip_address: str) -> str:
+        """校验并规范化 IPv4/IPv6，避免同一地址以不同文本重复入库。"""
+
+        try:
+            return str(ipaddress.ip_address(ip_address))
+        except ValueError as exc:
+            raise ValueError("IP 地址格式不正确") from exc
+
+
+class IpBlacklistItem(BaseModel):
+    """IP 黑名单单条响应。"""
+
+    id: int
+    ip_address: str
+    reason: str
+    created_at: datetime
+
+
+class IpBlacklistListResponse(BaseModel):
+    """IP 黑名单列表响应，包含总数与明细。"""
+
+    total: int
+    entries: list[IpBlacklistItem]
 
 
 class QuestionBankListResponse(BaseModel):

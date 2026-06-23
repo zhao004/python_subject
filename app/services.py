@@ -11,7 +11,7 @@ from sqlalchemy import Select, delete, desc, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import MAX_LEADERBOARD_LIMIT, MAX_SCORE, RESERVED_PUBLIC_SLUGS
-from app.models import AccessLog, QuestionBank, QuestionItem, ScoreRecord, SiteSetting, SubmissionLog
+from app.models import AccessLog, IpBlacklist, QuestionBank, QuestionItem, ScoreRecord, SiteSetting, SubmissionLog
 from app.schemas import (
     AccessLogInput,
     AccessLogListResponse,
@@ -21,6 +21,9 @@ from app.schemas import (
     AdminLeaderboardRecordPayload,
     AdminOverviewStats,
     DefaultQuestionBankResponse,
+    IpBlacklistItem,
+    IpBlacklistListResponse,
+    IpBlacklistPayload,
     LeaderboardEntry,
     LeaderboardResponse,
     QuestionBankDetail,
@@ -455,14 +458,14 @@ def list_bank_submission_logs(
     offset: int = 0,
     search: str | None = None,
 ) -> SubmissionLogListResponse:
-    """读取题库的提交流水，按时间倒序分页，支持按学生姓名或学号搜索。
+    """读取题库的提交流水，按时间倒序分页，支持按学生姓名、学号或 IP 搜索。
 
     Args:
         session: 数据库会话。
         bank_id: 题库 ID。
         limit: 每页条数，默认 100，上限 500。
         offset: 偏移量，默认 0。
-        search: 搜索关键字，模糊匹配学生姓名和学号。
+        search: 搜索关键字，模糊匹配学生姓名、学号和 IP。
 
     Returns:
         包含总数和当前页提交流水的响应。
@@ -478,6 +481,7 @@ def list_bank_submission_logs(
         base_conditions.append(
             (SubmissionLog.student_name.ilike(keyword))
             | (SubmissionLog.student_id.ilike(keyword))
+            | (SubmissionLog.ip_address.ilike(keyword))
         )
 
     total = (
@@ -504,6 +508,7 @@ def list_bank_submission_logs(
             total_pairs=row.total_pairs,
             score=row.score,
             elapsed_seconds=row.elapsed_seconds,
+            ip_address=row.ip_address,
             is_manual=row.is_manual,
             submitted_at=convert_storage_time_to_app_timezone(row.submitted_at),
         )
@@ -624,6 +629,7 @@ def _add_submission_log(
     total_pairs: int,
     score: int,
     elapsed_seconds: int,
+    ip_address: str | None,
     is_manual: bool,
 ) -> None:
     """写入提交流水快照（不单独提交，由调用方统一提交事务）。"""
@@ -639,6 +645,7 @@ def _add_submission_log(
             total_pairs=total_pairs,
             score=score,
             elapsed_seconds=elapsed_seconds,
+            ip_address=normalize_ip_address(ip_address),
             is_manual=is_manual,
             submitted_at=now,
             created_at=now,
@@ -650,6 +657,8 @@ def upsert_best_score(
     session: Session,
     bank: QuestionBank,
     submission: ScoreSubmission,
+    *,
+    ip_address: str | None = None,
 ) -> tuple[ScoreRecord, bool]:
     """写入或更新题库内学生最佳成绩，同时记录提交流水。"""
 
@@ -692,6 +701,7 @@ def upsert_best_score(
             total_pairs=total_pairs,
             score=score,
             elapsed_seconds=submission.elapsed_seconds,
+            ip_address=ip_address,
             is_manual=False,
         )
         session.commit()
@@ -709,6 +719,7 @@ def upsert_best_score(
             total_pairs=total_pairs,
             score=score,
             elapsed_seconds=submission.elapsed_seconds,
+            ip_address=ip_address,
             is_manual=False,
         )
         session.commit()
@@ -733,6 +744,7 @@ def upsert_best_score(
         total_pairs=total_pairs,
         score=score,
         elapsed_seconds=submission.elapsed_seconds,
+        ip_address=ip_address,
         is_manual=False,
     )
     session.commit()
@@ -887,6 +899,7 @@ def create_manual_score_record(
         total_pairs=total_pairs,
         score=score,
         elapsed_seconds=payload.elapsed_seconds,
+        ip_address=None,
         is_manual=True,
     )
     session.commit()
@@ -959,6 +972,91 @@ def normalize_ip_address(raw_ip: str | None) -> str:
         return str(ipaddress.ip_address(first_ip))
     except ValueError:
         return FALLBACK_IP
+
+
+def is_unknown_ip(ip_address: str | None) -> bool:
+    """判断 IP 是否为历史或异常回退值。"""
+
+    return normalize_ip_address(ip_address) == FALLBACK_IP
+
+
+def is_ip_blocked(session: Session, raw_ip: str | None) -> bool:
+    """判断 IP 是否在黑名单中，非法或未知 IP 不拦截。"""
+
+    ip_address = normalize_ip_address(raw_ip)
+    if ip_address == FALLBACK_IP:
+        return False
+    return session.scalar(select(IpBlacklist.id).where(IpBlacklist.ip_address == ip_address)) is not None
+
+
+def build_ip_blacklist_item(entry: IpBlacklist) -> IpBlacklistItem:
+    """转换 IP 黑名单响应。"""
+
+    return IpBlacklistItem(
+        id=entry.id,
+        ip_address=entry.ip_address,
+        reason=entry.reason,
+        created_at=convert_storage_time_to_app_timezone(entry.created_at),
+    )
+
+
+def list_ip_blacklist_entries(
+    session: Session,
+    *,
+    limit: int = ADMIN_LIST_DEFAULT_LIMIT,
+    offset: int = 0,
+    search: str | None = None,
+) -> IpBlacklistListResponse:
+    """读取 IP 黑名单，支持分页和按 IP/备注搜索。"""
+
+    safe_limit = max(1, min(limit, ADMIN_LIST_MAX_PAGE_SIZE))
+    safe_offset = max(0, offset)
+    conditions: list = []
+    if search:
+        keyword = f"%{search.strip()}%"
+        conditions.append((IpBlacklist.ip_address.ilike(keyword)) | (IpBlacklist.reason.ilike(keyword)))
+
+    total = session.scalar(select(func.count(IpBlacklist.id)).where(*conditions)) or 0
+    rows = session.scalars(
+        select(IpBlacklist)
+        .where(*conditions)
+        .order_by(IpBlacklist.created_at.desc(), IpBlacklist.id.desc())
+        .limit(safe_limit)
+        .offset(safe_offset)
+    ).all()
+    return IpBlacklistListResponse(total=total, entries=[build_ip_blacklist_item(row) for row in rows])
+
+
+def create_ip_blacklist_entry(session: Session, payload: IpBlacklistPayload) -> IpBlacklistItem:
+    """新增 IP 黑名单记录。"""
+
+    ip_address = normalize_ip_address(payload.ip_address)
+    if ip_address == FALLBACK_IP:
+        raise ServiceValidationError("IP 地址格式不正确")
+    existing = session.scalar(select(IpBlacklist).where(IpBlacklist.ip_address == ip_address))
+    if existing is not None:
+        raise ServiceConflictError("该 IP 已在黑名单中")
+
+    now = storage_now()
+    entry = IpBlacklist(
+        ip_address=ip_address,
+        reason=payload.reason,
+        created_at=now,
+    )
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    return build_ip_blacklist_item(entry)
+
+
+def delete_ip_blacklist_entry(session: Session, entry_id: int) -> None:
+    """删除 IP 黑名单记录。"""
+
+    entry = session.get(IpBlacklist, entry_id)
+    if entry is None:
+        raise ServiceNotFoundError("黑名单记录不存在")
+    session.delete(entry)
+    session.commit()
 
 
 def detect_device(user_agent: str) -> str:

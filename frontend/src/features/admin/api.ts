@@ -13,6 +13,8 @@ import type {
   LeaderboardRecord,
   LeaderboardRecordPayload,
   SubmissionLog,
+  IpBlacklistEntry,
+  IpBlacklistPayload,
   AccessLog,
   SiteSettings,
   AdminOverviewStats,
@@ -170,6 +172,34 @@ export async function batchDeleteSubmissionLogs(
       body: JSON.stringify({ ids }),
     },
   );
+}
+
+// ==================== IP 黑名单 ====================
+
+export async function fetchIpBlacklist(
+  params: ListParams = {},
+): Promise<ListResponse<IpBlacklistEntry>> {
+  const qs = buildQuery({
+    limit: params.limit ?? 25,
+    offset: params.offset ?? 0,
+    search: params.search,
+  });
+  return httpClient(apiUrl(`${ADMIN_API}/ip-blacklist${qs}`));
+}
+
+export async function createIpBlacklistEntry(
+  payload: IpBlacklistPayload,
+): Promise<IpBlacklistEntry> {
+  return httpClient(apiUrl(`${ADMIN_API}/ip-blacklist`), {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteIpBlacklistEntry(id: number | string): Promise<void> {
+  await httpClient(apiUrl(`${ADMIN_API}/ip-blacklist/${id}`), {
+    method: "DELETE",
+  });
 }
 
 // ==================== 访问日志 ====================

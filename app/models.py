@@ -154,11 +154,26 @@ class SubmissionLog(Base):
     total_pairs: Mapped[int] = mapped_column(Integer, nullable=False)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     elapsed_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=False, default="0.0.0.0", server_default="0.0.0.0", index=True)
     is_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=storage_now, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=storage_now)
 
     question_bank: Mapped[QuestionBank] = relationship(back_populates="submission_logs")
+
+
+class IpBlacklist(Base):
+    """全站 IP 黑名单。
+
+    仅用于公开访问链路拦截，后台管理接口不受该表影响。
+    """
+
+    __tablename__ = "ip_blacklist"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=False, unique=True, index=True)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=storage_now, index=True)
 
 
 class SiteSetting(Base):

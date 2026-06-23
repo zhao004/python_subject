@@ -81,9 +81,24 @@ export interface SubmissionLog {
   total_pairs: number;
   score: number;
   elapsed_seconds: number;
+  ip_address: string;
   is_manual: boolean;
   submitted_at: string;
   created_at?: string;
+}
+
+/** IP 黑名单记录 */
+export interface IpBlacklistEntry {
+  id: number;
+  ip_address: string;
+  reason: string;
+  created_at: string;
+}
+
+/** IP 黑名单创建载荷 */
+export interface IpBlacklistPayload {
+  ip_address: string;
+  reason?: string;
 }
 
 /** 访问日志 */

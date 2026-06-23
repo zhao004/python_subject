@@ -638,6 +638,28 @@ def test_submission_logs_track_every_submission(
     assert body["entries"][0]["is_manual"] is False
 
 
+def test_submission_logs_record_and_search_ip(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """公开提交应在提交流水中记录提交 IP，并支持按 IP 搜索。"""
+
+    _admin_login(client, monkeypatch)
+    bank_id = client.get("/api/admin/question-banks").json()["entries"][0]["id"]
+
+    submit_response = client.post(
+        "/api/scores",
+        json=build_payload(student_id="000000001", matched_pair_ids=[1, 2, 3]),
+        headers={"x-forwarded-for": "6.6.6.6"},
+    )
+    assert submit_response.status_code == 201
+
+    response = client.get(f"/api/admin/question-banks/{bank_id}/submission-logs?search=6.6.6.6")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["entries"][0]["ip_address"] == "6.6.6.6"
+
+
 def test_access_logs_filtered_by_bank_id(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -849,6 +871,77 @@ def test_submission_logs_search_by_student(
     body = response.json()
     assert body["total"] == 1
     assert body["entries"][0]["student_id"] == "000000001"
+
+
+def test_ip_blacklist_blocks_public_access_and_can_be_removed(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """黑名单 IP 应被禁止访问公开链路，删除后恢复访问。"""
+
+    _admin_login(client, monkeypatch)
+    create_response = client.post(
+        "/api/admin/ip-blacklist",
+        json={"ip_address": "7.7.7.7", "reason": "测试拉黑"},
+    )
+    assert create_response.status_code == 201
+    entry_id = create_response.json()["id"]
+    headers = {"x-forwarded-for": "7.7.7.7"}
+
+    blocked_requests = [
+        client.get(f"/api/public/question-banks/{TEST_BANK_SLUG}/quiz", headers=headers),
+        client.get(f"/api/public/question-banks/{TEST_BANK_SLUG}/leaderboard", headers=headers),
+        client.post("/api/scores", json=build_payload(student_id="000000003"), headers=headers),
+        client.post(
+            "/api/public/access-logs",
+            json={"page_path": f"/{TEST_BANK_SLUG}", "question_bank_slug": TEST_BANK_SLUG},
+            headers=headers,
+        ),
+    ]
+    assert all(response.status_code == 403 for response in blocked_requests)
+    assert all(response.json()["detail"] == "当前 IP 已被限制访问" for response in blocked_requests)
+
+    allowed_response = client.get(
+        f"/api/public/question-banks/{TEST_BANK_SLUG}/quiz",
+        headers={"x-forwarded-for": "7.7.7.8"},
+    )
+    assert allowed_response.status_code == 200
+
+    delete_response = client.delete(f"/api/admin/ip-blacklist/{entry_id}")
+    assert delete_response.status_code == 204
+    restored_response = client.get(f"/api/public/question-banks/{TEST_BANK_SLUG}/quiz", headers=headers)
+    assert restored_response.status_code == 200
+
+
+def test_ip_blacklist_rejects_duplicate_and_invalid_ip(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """黑名单应拒绝重复 IP 和非法 IP。"""
+
+    _admin_login(client, monkeypatch)
+    first_response = client.post("/api/admin/ip-blacklist", json={"ip_address": "8.8.8.8"})
+    assert first_response.status_code == 201
+
+    duplicate_response = client.post("/api/admin/ip-blacklist", json={"ip_address": "8.8.8.8"})
+    assert duplicate_response.status_code == 409
+
+    invalid_response = client.post("/api/admin/ip-blacklist", json={"ip_address": "not-an-ip"})
+    assert invalid_response.status_code == 422
+
+
+def test_ip_blacklist_list_supports_search(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """黑名单列表应支持按 IP 或备注搜索。"""
+
+    _admin_login(client, monkeypatch)
+    client.post("/api/admin/ip-blacklist", json={"ip_address": "9.9.9.9", "reason": "搜索测试"})
+    client.post("/api/admin/ip-blacklist", json={"ip_address": "9.9.9.10", "reason": "其他记录"})
+
+    response = client.get("/api/admin/ip-blacklist?search=搜索")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["entries"][0]["ip_address"] == "9.9.9.9"
 
 
 def test_batch_delete_leaderboard_records(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

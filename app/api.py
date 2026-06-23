@@ -27,6 +27,9 @@ from app.schemas import (
     AdminOverviewStats,
     AdminSessionResponse,
     DefaultQuestionBankResponse,
+    IpBlacklistItem,
+    IpBlacklistListResponse,
+    IpBlacklistPayload,
     LeaderboardResponse,
     QuestionBankDetail,
     QuestionBankListResponse,
@@ -54,8 +57,10 @@ from app.services import (
     build_quiz_response,
     build_score_response,
     create_access_log,
+    create_ip_blacklist_entry,
     create_manual_score_record,
     create_question_bank,
+    delete_ip_blacklist_entry,
     delete_question_bank,
     delete_score_record,
     generate_unique_random_slug,
@@ -65,8 +70,10 @@ from app.services import (
     get_question_bank_by_slug,
     get_site_settings,
     get_submission_trend,
+    is_ip_blocked,
     list_access_logs,
     list_bank_submission_logs,
+    list_ip_blacklist_entries,
     list_leaderboard_entries,
     list_question_banks,
     normalize_ip_address,
@@ -80,6 +87,7 @@ from app.services import (
 router = APIRouter(prefix="/api")
 SessionDep = Annotated[Session, Depends(get_db_session)]
 AdminDep = Annotated[str, Depends(get_current_admin)]
+BLOCKED_IP_DETAIL = "当前 IP 已被限制访问"
 
 
 def raise_http_from_service_error(exc: ValueError) -> None:
@@ -102,10 +110,54 @@ def client_ip_from_request(request: Request) -> str:
     return normalize_ip_address(forwarded_for or direct_ip)
 
 
+def reject_blacklisted_ip(request: Request, session: Session) -> str:
+    """检查公开访问 IP，命中黑名单时直接拒绝请求。"""
+
+    ip_address = client_ip_from_request(request)
+    if is_ip_blocked(session, ip_address):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=BLOCKED_IP_DETAIL)
+    return ip_address
+
+
+def read_public_quiz_response(slug: str, session: Session) -> QuizResponse:
+    """读取公开题库测验响应，供新旧公开接口复用。"""
+
+    bank = get_question_bank_by_slug(session, slug)
+    return build_quiz_response(bank)
+
+
+def submit_public_score_response(
+    slug: str,
+    submission: ScoreSubmission,
+    session: Session,
+    *,
+    ip_address: str,
+) -> ScoreSubmissionResponse:
+    """提交公开成绩响应，供新旧公开接口复用。"""
+
+    bank = get_question_bank_by_slug(session, slug)
+    record, saved_as_best = upsert_best_score(session, bank, submission, ip_address=ip_address)
+    response_record = build_score_response(record)
+    return ScoreSubmissionResponse(saved_as_best=saved_as_best, record=response_record)
+
+
+def read_public_leaderboard_response(
+    slug: str,
+    session: Session,
+    *,
+    limit: int | None = None,
+) -> LeaderboardResponse:
+    """读取公开排行榜响应，供新旧公开接口复用。"""
+
+    bank = get_question_bank_by_slug(session, slug)
+    return build_leaderboard_response(session, bank, limit=limit)
+
+
 @router.get("/public/default-question-bank", response_model=DefaultQuestionBankResponse)
-def read_default_question_bank(session: SessionDep) -> DefaultQuestionBankResponse:
+def read_default_question_bank(request: Request, session: SessionDep) -> DefaultQuestionBankResponse:
     """读取主域名默认跳转题库。"""
 
+    reject_blacklisted_ip(request, session)
     try:
         return get_default_question_bank(session)
     except SQLAlchemyError as exc:
@@ -113,12 +165,12 @@ def read_default_question_bank(session: SessionDep) -> DefaultQuestionBankRespon
 
 
 @router.get("/public/question-banks/{slug}/quiz", response_model=QuizResponse)
-def read_public_quiz(slug: str, session: SessionDep) -> QuizResponse:
+def read_public_quiz(slug: str, request: Request, session: SessionDep) -> QuizResponse:
     """读取指定题库测验配置。"""
 
+    reject_blacklisted_ip(request, session)
     try:
-        bank = get_question_bank_by_slug(session, slug)
-        return build_quiz_response(bank)
+        return read_public_quiz_response(slug, session)
     except ValueError as exc:
         raise_http_from_service_error(exc)
     except SQLAlchemyError as exc:
@@ -126,13 +178,17 @@ def read_public_quiz(slug: str, session: SessionDep) -> QuizResponse:
 
 
 @router.post("/public/question-banks/{slug}/scores", response_model=ScoreSubmissionResponse, status_code=201)
-def submit_public_score(slug: str, submission: ScoreSubmission, session: SessionDep) -> ScoreSubmissionResponse:
+def submit_public_score(
+    slug: str,
+    submission: ScoreSubmission,
+    request: Request,
+    session: SessionDep,
+) -> ScoreSubmissionResponse:
     """提交指定题库成绩并维护最佳记录。"""
 
+    ip_address = reject_blacklisted_ip(request, session)
     try:
-        bank = get_question_bank_by_slug(session, slug)
-        record, saved_as_best = upsert_best_score(session, bank, submission)
-        response_record = build_score_response(record)
+        return submit_public_score_response(slug, submission, session, ip_address=ip_address)
     except ValueError as exc:
         session.rollback()
         raise_http_from_service_error(exc)
@@ -140,20 +196,19 @@ def submit_public_score(slug: str, submission: ScoreSubmission, session: Session
         session.rollback()
         raise HTTPException(status_code=500, detail="成绩保存失败，请稍后重试") from exc
 
-    return ScoreSubmissionResponse(saved_as_best=saved_as_best, record=response_record)
-
 
 @router.get("/public/question-banks/{slug}/leaderboard", response_model=LeaderboardResponse)
 def read_public_leaderboard(
     slug: str,
+    request: Request,
     session: SessionDep,
     limit: Annotated[int | None, Query(ge=1, le=MAX_LEADERBOARD_LIMIT)] = None,
 ) -> LeaderboardResponse:
     """读取指定题库公开排行榜。"""
 
+    reject_blacklisted_ip(request, session)
     try:
-        bank = get_question_bank_by_slug(session, slug)
-        return build_leaderboard_response(session, bank, limit=limit)
+        return read_public_leaderboard_response(slug, session, limit=limit)
     except ValueError as exc:
         raise_http_from_service_error(exc)
     except SQLAlchemyError as exc:
@@ -164,7 +219,7 @@ def read_public_leaderboard(
 def write_access_log(payload: AccessLogInput, request: Request, session: SessionDep) -> Response:
     """写入公开页面访问记录。"""
 
-    ip_address = client_ip_from_request(request)
+    ip_address = reject_blacklisted_ip(request, session)
     user_agent = request.headers.get("user-agent", "")
     resolver = getattr(request.app.state, "ip_region_resolver", None)
     region = resolver.resolve(ip_address) if resolver is not None else None
@@ -182,34 +237,47 @@ def write_access_log(payload: AccessLogInput, request: Request, session: Session
 
 
 @router.get("/quiz", response_model=QuizResponse, include_in_schema=False)
-def read_legacy_quiz(session: SessionDep) -> QuizResponse:
+def read_legacy_quiz(request: Request, session: SessionDep) -> QuizResponse:
     """兼容旧接口：读取默认题库测验。"""
 
+    reject_blacklisted_ip(request, session)
     default_bank = get_default_question_bank(session).question_bank
     if default_bank is None:
         raise HTTPException(status_code=404, detail="尚未配置默认题库")
-    bank = get_question_bank_by_slug(session, default_bank.slug)
-    return build_quiz_response(bank)
+    return read_public_quiz_response(default_bank.slug, session)
 
 
 @router.post("/scores", response_model=ScoreSubmissionResponse, status_code=201, include_in_schema=False)
-def submit_legacy_score(submission: ScoreSubmission, session: SessionDep) -> ScoreSubmissionResponse:
+def submit_legacy_score(
+    submission: ScoreSubmission,
+    request: Request,
+    session: SessionDep,
+) -> ScoreSubmissionResponse:
     """兼容旧接口：向默认题库提交成绩。"""
 
+    ip_address = reject_blacklisted_ip(request, session)
     default_bank = get_default_question_bank(session).question_bank
     if default_bank is None:
         raise HTTPException(status_code=404, detail="尚未配置默认题库")
-    return submit_public_score(default_bank.slug, submission, session)
+    try:
+        return submit_public_score_response(default_bank.slug, submission, session, ip_address=ip_address)
+    except ValueError as exc:
+        session.rollback()
+        raise_http_from_service_error(exc)
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise HTTPException(status_code=500, detail="成绩保存失败，请稍后重试") from exc
 
 
 @router.get("/leaderboard", response_model=LeaderboardResponse, include_in_schema=False)
-def read_legacy_leaderboard(session: SessionDep) -> LeaderboardResponse:
+def read_legacy_leaderboard(request: Request, session: SessionDep) -> LeaderboardResponse:
     """兼容旧接口：读取默认题库排行榜。"""
 
+    reject_blacklisted_ip(request, session)
     default_bank = get_default_question_bank(session).question_bank
     if default_bank is None:
         raise HTTPException(status_code=404, detail="尚未配置默认题库")
-    return read_public_leaderboard(default_bank.slug, session)
+    return read_public_leaderboard_response(default_bank.slug, session)
 
 
 @router.post("/admin/login", response_model=AdminSessionResponse)
@@ -559,6 +627,55 @@ def batch_delete_admin_leaderboard_records(
         session.rollback()
         raise HTTPException(status_code=500, detail="排行榜记录批量删除失败") from exc
     return {"deleted": deleted}
+
+
+@router.get("/admin/ip-blacklist", response_model=IpBlacklistListResponse)
+def read_admin_ip_blacklist(
+    _: AdminDep,
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    search: Annotated[str | None, Query(min_length=1, max_length=255)] = None,
+) -> IpBlacklistListResponse:
+    """后台读取 IP 黑名单，支持分页和搜索。"""
+
+    try:
+        return list_ip_blacklist_entries(session, limit=limit, offset=offset, search=search)
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="IP 黑名单读取失败") from exc
+
+
+@router.post("/admin/ip-blacklist", response_model=IpBlacklistItem, status_code=201)
+def create_admin_ip_blacklist_entry(
+    payload: IpBlacklistPayload,
+    _: AdminDep,
+    session: SessionDep,
+) -> IpBlacklistItem:
+    """后台新增 IP 黑名单记录。"""
+
+    try:
+        return create_ip_blacklist_entry(session, payload)
+    except ValueError as exc:
+        session.rollback()
+        raise_http_from_service_error(exc)
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise HTTPException(status_code=500, detail="IP 黑名单保存失败") from exc
+
+
+@router.delete("/admin/ip-blacklist/{entry_id}", status_code=204)
+def delete_admin_ip_blacklist_entry(entry_id: int, _: AdminDep, session: SessionDep) -> Response:
+    """后台解除 IP 黑名单。"""
+
+    try:
+        delete_ip_blacklist_entry(session, entry_id)
+    except ValueError as exc:
+        session.rollback()
+        raise_http_from_service_error(exc)
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise HTTPException(status_code=500, detail="IP 黑名单删除失败") from exc
+    return Response(status_code=204)
 
 
 @router.get("/admin/access-logs", response_model=AccessLogListResponse)

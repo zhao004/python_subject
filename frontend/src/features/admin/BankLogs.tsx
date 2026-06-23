@@ -9,9 +9,10 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Trash2, Download, ShieldBan } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -37,11 +38,13 @@ import {
   fetchQuestionBank,
   fetchSubmissionLogs,
   batchDeleteSubmissionLogs,
+  createIpBlacklistEntry,
 } from "./api";
 import { exportToExcel, fetchAllPages } from "@/lib/export-excel";
 
 /** 可选每页条数 */
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+const UNKNOWN_IP = "0.0.0.0";
 
 /** 秒 → m:ss */
 function formatElapsed(seconds: number): string {
@@ -61,11 +64,22 @@ function formatDateTime(dateStr: string): string {
   }
 }
 
+/** 判断提交流水 IP 是否可用于拉黑 */
+function canBlacklistIp(ipAddress: string | undefined, isManual: boolean): boolean {
+  return !isManual && Boolean(ipAddress && ipAddress !== UNKNOWN_IP);
+}
+
+/** 展示提交流水 IP，兼容历史记录 */
+function formatLogIp(ipAddress: string | undefined): string {
+  return ipAddress && ipAddress !== UNKNOWN_IP ? ipAddress : "未知";
+}
+
 export default function BankLogs() {
   const { id: bankId } = useParams();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(20);
+  const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [exporting, setExporting] = useState(false);
 
@@ -78,8 +92,8 @@ export default function BankLogs() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-submission-logs", bankId, offset, pageSize],
-    queryFn: () => fetchSubmissionLogs(bankId!, { limit: pageSize, offset }),
+    queryKey: ["admin-submission-logs", bankId, { offset, pageSize, search }],
+    queryFn: () => fetchSubmissionLogs(bankId!, { limit: pageSize, offset, search: search || undefined }),
     enabled: Boolean(bankId),
   });
 
@@ -93,6 +107,19 @@ export default function BankLogs() {
       queryClient.invalidateQueries({ queryKey: ["admin-submission-logs", bankId] });
       setSelectedIds(new Set());
       toast.success("批量删除完成");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const blacklistMutation = useMutation({
+    mutationFn: ({ ipAddress, logId }: { ipAddress: string; logId: number }) =>
+      createIpBlacklistEntry({
+        ip_address: ipAddress,
+        reason: `来自提交流水 #${logId}`,
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-ip-blacklist"] });
+      toast.success(`已拉黑 IP：${variables.ipAddress}`);
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -120,7 +147,7 @@ export default function BankLogs() {
     setExporting(true);
     try {
       const allEntries = await fetchAllPages(
-        (offset, limit) => fetchSubmissionLogs(bankId, { limit, offset }),
+        (offset, limit) => fetchSubmissionLogs(bankId, { limit, offset, search: search || undefined }),
         100,
       );
       if (allEntries.length === 0) {
@@ -132,6 +159,7 @@ export default function BankLogs() {
         student_id: log.student_id,
         student_name: log.student_name,
         score: log.score,
+        ip_address: formatLogIp(log.ip_address),
         correct_count: log.correct_count,
         total_pairs: log.total_pairs,
         elapsed: formatElapsed(log.elapsed_seconds),
@@ -146,6 +174,7 @@ export default function BankLogs() {
           { key: "student_id", label: "学号" },
           { key: "student_name", label: "姓名" },
           { key: "score", label: "分数" },
+          { key: "ip_address", label: "IP地址" },
           { key: "correct_count", label: "正确数" },
           { key: "total_pairs", label: "总题数" },
           { key: "elapsed", label: "用时" },
@@ -188,8 +217,8 @@ export default function BankLogs() {
         </Button>
       </div>
 
-      {/* 操作栏 */}
-      <div className="flex items-center justify-between">
+      {/* 搜索 + 操作栏 */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         {selectedIds.size > 0 ? (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
@@ -208,28 +237,40 @@ export default function BankLogs() {
         ) : (
           <span className="text-sm text-muted-foreground">共 {total} 条记录</span>
         )}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">每页</span>
-          <Select
-            value={String(pageSize)}
-            onValueChange={(val) => {
-              setPageSize(Number(val));
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Input
+            placeholder="搜索姓名/学号/IP..."
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
               setPage(1);
               setSelectedIds(new Set());
             }}
-          >
-            <SelectTrigger className="w-[80px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-sm text-muted-foreground">条</span>
+            className="w-full sm:w-64"
+          />
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">每页</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(val) => {
+                setPageSize(Number(val));
+                setPage(1);
+                setSelectedIds(new Set());
+              }}
+            >
+              <SelectTrigger className="w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">条</span>
+          </div>
         </div>
       </div>
 
@@ -252,15 +293,17 @@ export default function BankLogs() {
                 <TableHead className="text-right">正确数</TableHead>
                 <TableHead className="text-right">总题数</TableHead>
                 <TableHead>用时</TableHead>
+                <TableHead>IP</TableHead>
                 <TableHead>类型</TableHead>
                 <TableHead>提交时间</TableHead>
+                <TableHead className="w-24 text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 10 }).map((__, j) => (
+                    {Array.from({ length: 12 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -269,7 +312,7 @@ export default function BankLogs() {
                 ))
               ) : entries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
                     暂无记录
                   </TableCell>
                 </TableRow>
@@ -289,6 +332,7 @@ export default function BankLogs() {
                     <TableCell className="text-right">{log.correct_count}</TableCell>
                     <TableCell className="text-right">{log.total_pairs}</TableCell>
                     <TableCell>{formatElapsed(log.elapsed_seconds)}</TableCell>
+                    <TableCell className="font-mono text-xs">{formatLogIp(log.ip_address)}</TableCell>
                     <TableCell>
                       {log.is_manual ? (
                         <Badge variant="secondary">手工</Badge>
@@ -298,6 +342,26 @@ export default function BankLogs() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDateTime(log.submitted_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {canBlacklistIp(log.ip_address, log.is_manual) ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            blacklistMutation.mutate({
+                              ipAddress: log.ip_address,
+                              logId: log.id,
+                            })
+                          }
+                          disabled={blacklistMutation.isPending}
+                        >
+                          <ShieldBan className="mr-1 h-4 w-4" />
+                          拉黑
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
