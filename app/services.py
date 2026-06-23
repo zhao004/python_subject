@@ -377,7 +377,7 @@ def get_admin_overview_stats(session: Session) -> AdminOverviewStats:
 def get_submission_trend(session: Session, bank_ids: list[int] | None = None) -> SubmissionTrendResponse:
     """读取最近 7 天各题库每日提交数量，按 date → bank 聚合。
 
-    bank_ids 传入时仅查询指定题库，否则查询全部启用题库（上限 20 个）。
+    bank_ids 传入时仅查询指定题库，否则查询全部题库。
     """
 
     now = storage_now()
@@ -391,13 +391,25 @@ def get_submission_trend(session: Session, bank_ids: list[int] | None = None) ->
     if bank_ids:
         query_args.append(SubmissionLog.question_bank_id.in_(bank_ids))
 
-    bank_rows = session.scalars(
-        bank_query().order_by(QuestionBank.created_at.desc(), QuestionBank.id.desc()).limit(20)
-    ).all()
-    if not bank_rows:
-        return SubmissionTrendResponse(dates=[], series=[])
+    dates: list[str] = []
+    for offset in range(TREND_WINDOW_DAYS):
+        day = start + timedelta(days=offset)
+        dates.append(day.strftime("%Y-%m-%d"))
 
-    available_bank_ids = {bank.id for bank in bank_rows}
+    bank_query_args = []
+    if bank_ids:
+        bank_query_args.append(QuestionBank.id.in_(bank_ids))
+    bank_rows_query = select(QuestionBank.id, QuestionBank.name).order_by(
+        QuestionBank.created_at.desc(),
+        QuestionBank.id.desc(),
+    )
+    if bank_query_args:
+        bank_rows_query = bank_rows_query.where(*bank_query_args)
+    bank_rows = session.execute(bank_rows_query).all()
+    if not bank_rows:
+        return SubmissionTrendResponse(dates=dates, series=[])
+
+    available_bank_ids = {row.id for row in bank_rows}
     if not bank_ids:
         effective_bank_ids = list(available_bank_ids)
     else:
@@ -415,22 +427,18 @@ def get_submission_trend(session: Session, bank_ids: list[int] | None = None) ->
 
     daily_map: dict[tuple[int, str], int] = {}
     for row in grouped_rows:
-        daily_map[(row.question_bank_id, row.day)] = row.count
-
-    dates: list[str] = []
-    for offset in range(TREND_WINDOW_DAYS):
-        day = start + timedelta(days=offset)
-        dates.append(day.strftime("%Y-%m-%d"))
+        day_key = row.day.strftime("%Y-%m-%d") if hasattr(row.day, "strftime") else str(row.day)
+        daily_map[(row.question_bank_id, day_key)] = row.count
 
     series: list[dict[str, object]] = []
-    for bank in bank_rows:
-        if bank.id not in effective_bank_ids:
+    for bank_row in bank_rows:
+        if bank_row.id not in effective_bank_ids:
             continue
         series.append(
             {
-                "bank_id": bank.id,
-                "bank_name": bank.name,
-                "data": [daily_map.get((bank.id, day), 0) for day in dates],
+                "bank_id": bank_row.id,
+                "bank_name": bank_row.name,
+                "data": [daily_map.get((bank_row.id, day), 0) for day in dates],
             }
         )
 

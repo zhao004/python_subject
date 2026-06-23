@@ -2,7 +2,7 @@
  * 后台概览仪表盘
  *
  * 替代原 react-admin Dashboard.tsx。
- * 4 指标卡 + ECharts 7天提交趋势堆叠柱状图。
+ * 4 指标卡 + ECharts 7天提交趋势折线统计图。
  * 使用 useThemeMode 替代 RA useTheme 驱动 ECharts 配色。
  * echarts-for-react 改为 lazy import 减小公开端 bundle 体积。
  */
@@ -105,13 +105,21 @@ export default function Dashboard() {
   });
 
   /** 7天提交趋势 */
-  const { data: trend, isLoading: trendLoading } = useQuery({
+  const {
+    data: trend,
+    isLoading: trendLoading,
+    isError: trendIsError,
+    error: trendError,
+  } = useQuery({
     queryKey: ["admin-trend", bankFilter],
     queryFn: () => fetchSubmissionTrend(bankFilter || undefined),
   });
 
   const banks: QuestionBank[] = banksData?.entries ?? [];
   const trendData: SubmissionTrendResponse | undefined = trend;
+  const hasTrendSeries = (trendData?.series?.length ?? 0) > 0;
+  const trendErrorMessage =
+    trendError instanceof Error ? trendError.message : "提交趋势读取失败";
 
   /** ECharts 配置（useMemo 避免每次渲染重建对象） */
   const chartOption = useMemo(
@@ -119,26 +127,32 @@ export default function Dashboard() {
       backgroundColor: "transparent",
       tooltip: {
         trigger: "axis",
-        axisPointer: { type: "shadow" },
+        axisPointer: { type: "line" },
       },
       legend: {
+        type: "scroll",
+        top: 0,
         data: trendData?.series?.map((b) => b.bank_name) ?? [],
         textStyle: { color: isDark ? "#a1a1aa" : "#666" },
       },
       grid: {
         left: "3%",
         right: "4%",
+        top: 48,
         bottom: "3%",
         containLabel: true,
       },
       xAxis: {
         type: "category",
+        boundaryGap: false,
         data: trendData?.dates ?? [],
         axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
         axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
       },
       yAxis: {
         type: "value",
+        min: 0,
+        minInterval: 1,
         axisLine: { lineStyle: { color: isDark ? "#3f3f46" : "#ddd" } },
         axisLabel: { color: isDark ? "#a1a1aa" : "#666" },
         splitLine: { lineStyle: { color: isDark ? "#27272a" : "#eee" } },
@@ -146,10 +160,18 @@ export default function Dashboard() {
       series:
         trendData?.series?.map((bank, i) => ({
           name: bank.bank_name,
-          type: "bar",
-          stack: "total",
+          type: "line",
+          smooth: false,
+          symbol: "circle",
+          symbolSize: 6,
+          showSymbol: true,
           data: bank.data,
+          lineStyle: {
+            width: 2,
+            color: CHART_COLORS[i % CHART_COLORS.length],
+          },
           itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length] },
+          emphasis: { focus: "series" },
         })) ?? [],
     }),
     [trendData, isDark],
@@ -218,6 +240,14 @@ export default function Dashboard() {
         <CardContent>
           {trendLoading ? (
             <Skeleton className="h-[340px] w-full" />
+          ) : trendIsError ? (
+            <div className="grid h-[340px] place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
+              {trendErrorMessage}
+            </div>
+          ) : !hasTrendSeries ? (
+            <div className="grid h-[340px] place-items-center rounded-md border border-dashed text-sm text-muted-foreground">
+              暂无趋势数据
+            </div>
           ) : (
             <Suspense fallback={<Skeleton className="h-[340px] w-full" />}>
               <ReactECharts

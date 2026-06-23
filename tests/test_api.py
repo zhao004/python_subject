@@ -552,6 +552,33 @@ def test_submission_trend_includes_7_day_dates(client: TestClient, monkeypatch: 
     assert sum(body["series"][0]["data"]) == 1
 
 
+def test_submission_trend_keeps_old_bank_data_when_many_banks(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """题库数量超过 20 个时，旧题库的提交趋势不能被截断丢失。"""
+
+    _admin_login(client, monkeypatch)
+    bank_id = client.get("/api/admin/question-banks").json()["entries"][0]["id"]
+    for index in range(1, 22):
+        _create_extra_bank(client, slug=f"trend-bank-{index}")
+
+    client.post("/api/scores", json=build_payload(matched_pair_ids=[1, 2, 3]))
+
+    response = client.get("/api/admin/submission-trend")
+    assert response.status_code == 200
+    all_series = response.json()["series"]
+    default_bank_series = next((series for series in all_series if series["bank_id"] == bank_id), None)
+    assert default_bank_series is not None
+    assert sum(default_bank_series["data"]) == 1
+
+    filtered_response = client.get(f"/api/admin/submission-trend?bank_id={bank_id}")
+    assert filtered_response.status_code == 200
+    filtered_series = filtered_response.json()["series"]
+    assert len(filtered_series) == 1
+    assert filtered_series[0]["bank_id"] == bank_id
+    assert sum(filtered_series[0]["data"]) == 1
+
+
 def test_submission_logs_track_every_submission(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
