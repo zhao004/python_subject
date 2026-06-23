@@ -26,6 +26,8 @@ DEFAULT_MYSQL_PORT = 3306
 DEFAULT_MYSQL_CHARSET = "utf8mb4"
 DEFAULT_MYSQL_COLLATION = "utf8mb4_unicode_ci"
 ENV_FILE = ".env"
+# 公开题库链接已放到根路径，以下片段必须保留给系统路由和静态资源。
+RESERVED_PUBLIC_SLUGS = frozenset({"admin", "api", "assets", "b", "docs", "openapi.json", "redoc"})
 BOOLEAN_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 BOOLEAN_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 

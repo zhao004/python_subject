@@ -168,7 +168,6 @@ interface LeaderboardPageProps {
   entries: LeaderboardEntry[];
   isLoading: boolean;
   publicError: string;
-  siteTitle: string;
   styleClass: string;
   onNavigateHome: () => void;
 }
@@ -184,7 +183,6 @@ export function LeaderboardPage({
   entries,
   isLoading,
   publicError,
-  siteTitle,
   styleClass,
   onNavigateHome,
 }: LeaderboardPageProps) {
@@ -219,10 +217,10 @@ export function LeaderboardPage({
         <header className="hero-gradient grid gap-4 rounded-lg p-4 text-brand-surface shadow-soft sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:p-5">
           <div>
             <p className="text-xs font-black tracking-wide text-brand-hero-accent">
-              {quiz.question_bank.name}
+              排行榜
             </p>
             <h1 className="font-serif text-4xl sm:text-[2.25rem]">
-              {siteTitle}排行榜
+              {quiz.question_bank.name}
             </h1>
             <p className="mt-1 leading-relaxed text-brand-hero-text">
               显示前 {quiz.question_bank.leaderboard_limit} 名，同分时用时更短排名更靠前。

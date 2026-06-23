@@ -16,8 +16,10 @@ interface StudentIdentityModalProps {
   form: StudentForm;
   rememberStudent: boolean;
   styleClass: string;
+  mode?: "confirm" | "edit";
   onConfirm: () => void;
   onFormChange: (fieldName: keyof StudentForm, value: string) => void;
+  onOpenChange?: (open: boolean) => void;
   onRememberChange: (checked: boolean) => void;
 }
 
@@ -37,25 +39,38 @@ export function StudentIdentityModal({
   form,
   rememberStudent,
   styleClass,
+  mode = "confirm",
   onConfirm,
   onFormChange,
+  onOpenChange,
   onRememberChange,
 }: StudentIdentityModalProps) {
+  const isConfirmMode = mode === "confirm";
+  const headingLabel = isConfirmMode ? "身份确认" : "用户信息";
+  const title = isConfirmMode ? "请认真填写" : "编辑用户信息";
+  const submitLabel = isConfirmMode ? "确认并开始" : "保存";
+
   return (
-    <Dialog open={open}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
           styleClass,
-          "max-w-[34rem] gap-4 border-brand-line bg-brand-surface p-4 text-brand-text",
+          "max-w-[34rem] gap-4 border-brand-line bg-brand-surface p-4 text-brand-text [&>button]:text-brand-text-soft [&>button]:focus:ring-brand-accent [&>button]:hover:text-brand",
         )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          if (isConfirmMode) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isConfirmMode) e.preventDefault();
+        }}
       >
         {/* 渐变标题区 */}
         <DialogHeader className="hero-gradient rounded-lg p-4">
-          <p className="text-xs font-black tracking-wide text-brand-hero-accent">身份确认</p>
+          <p className="text-xs font-black tracking-wide text-brand-hero-accent">
+            {headingLabel}
+          </p>
           <DialogTitle className="font-serif text-xl text-brand-surface">
-            请认真填写
+            {title}
           </DialogTitle>
         </DialogHeader>
 
@@ -89,7 +104,7 @@ export function StudentIdentityModal({
           )}
 
           <Button type="submit" variant="publicPrimary" className="w-full" size="lg">
-            确认并开始
+            {submitLabel}
           </Button>
         </form>
       </DialogContent>

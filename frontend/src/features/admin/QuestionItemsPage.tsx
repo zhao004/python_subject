@@ -51,7 +51,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { fetchQuestionBank, updateQuestionBank } from "./api";
-import type { QuestionBank, QuestionBankPayload } from "./types";
+import type { QuestionBank, QuestionBankPayload, SubmissionStyleKey } from "./types";
+
+/** 题库主题风格白名单，题目保存时必须原样携带有效值，避免覆盖为默认主题。 */
+const SUPPORTED_SUBMISSION_STYLES = new Set<SubmissionStyleKey>([
+  "classic",
+  "slate",
+  "paper",
+]);
 
 /** 表单值类型（仅 items，保存时与基本信息合并） */
 interface ItemsFormValues {
@@ -141,6 +148,17 @@ function bankToItemsForm(bank: QuestionBank): ItemsFormValues {
   };
 }
 
+/** 校验题库主题风格，异常时阻止整体 PUT 覆盖已有配置。 */
+function requireSubmissionStyle(value: unknown): SubmissionStyleKey {
+  if (
+    typeof value === "string" &&
+    SUPPORTED_SUBMISSION_STYLES.has(value as SubmissionStyleKey)
+  ) {
+    return value as SubmissionStyleKey;
+  }
+  throw new Error("题库主题风格数据异常，请先在编辑题库中重新保存主题风格");
+}
+
 /** 过滤空行，并与题库基本信息合并为完整提交载荷 */
 function buildPayload(
   bank: QuestionBank,
@@ -153,7 +171,7 @@ function buildPayload(
     announcement: bank.announcement ?? "",
     is_active: bank.is_active,
     leaderboard_limit: bank.leaderboard_limit,
-    submission_style: bank.submission_style,
+    submission_style: requireSubmissionStyle(bank.submission_style),
     items: values.items
       .map((item) => ({
         left_text: item.left_text.trim(),

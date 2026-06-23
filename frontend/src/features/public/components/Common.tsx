@@ -63,17 +63,16 @@ export function StatusCard({label, value, variant = "default"}: StatusCardProps)
     return (
         <div
             className={cn(
-                "grid min-w-0 gap-0.5 rounded-lg border border-brand-line bg-brand-surface p-3",
+                "grid min-w-0 gap-0.5 rounded-lg border border-brand-line bg-brand-surface p-2 sm:p-3",
             )}
         >
-            <span className="text-xs font-black text-brand-text-soft">{label}</span>
+            <span className="text-[0.68rem] font-black text-brand-text-soft sm:text-xs">{label}</span>
             <strong
                 className={cn(
-                    "overflow-wrap-anywhere text-2xl leading-none",
+                    "overflow-wrap-anywhere text-lg leading-none sm:text-[1.7rem]",
                     variant === "timer"
                         ? "text-brand-accent tabular-nums"
                         : "text-brand",
-                    "sm:text-[1.7rem]",
                 )}
             >
                 {value}

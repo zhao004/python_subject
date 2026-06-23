@@ -36,6 +36,10 @@ import { HomePage } from "./components/Common";
 import { QuizPage } from "./components/QuizPage";
 import { LeaderboardPage } from "./components/Leaderboard";
 import { StudentIdentityModal } from "./components/StudentIdentityModal";
+import {
+  buildPublicLeaderboardPath,
+  buildPublicQuizPath,
+} from "./links";
 
 interface PublicAppProps {
   route: RouteInfo;
@@ -78,9 +82,12 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
   const [matchedPairIds, setMatchedPairIds] = useState<Set<number>>(() => new Set());
   const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [studentForm, setStudentForm] = useState<StudentForm>({ ...DEFAULT_STUDENT_FORM });
+  const [studentDraft, setStudentDraft] = useState<StudentForm>({ ...DEFAULT_STUDENT_FORM });
   const [rememberStudent, setRememberStudent] = useState(false);
+  const [rememberDraft, setRememberDraft] = useState(false);
   const [identityError, setIdentityError] = useState("");
   const [isIdentityConfirmed, setIsIdentityConfirmed] = useState(false);
+  const [isStudentEditorOpen, setIsStudentEditorOpen] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [timerStopped, setTimerStopped] = useState(false);
@@ -113,7 +120,7 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
         const result = await fetchDefaultQuestionBank();
         if (!isActive) return;
         if (result.question_bank) {
-          navigateTo(`/b/${encodeURIComponent(result.question_bank.slug)}`, true);
+          navigateTo(buildPublicQuizPath(result.question_bank.slug), true);
           return;
         }
       } catch (error) {
@@ -135,9 +142,12 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
     const timeoutId = window.setTimeout(() => {
       const rememberedProfile = readRememberedStudentProfile(slug);
       setStudentForm(rememberedProfile.form);
+      setStudentDraft(rememberedProfile.form);
       setRememberStudent(rememberedProfile.rememberStudent);
+      setRememberDraft(rememberedProfile.rememberStudent);
       setIdentityError("");
       setIsIdentityConfirmed(false);
+      setIsStudentEditorOpen(false);
       setStartedAt(null);
       setElapsedSeconds(0);
       setTimerStopped(false);
@@ -221,6 +231,23 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
     });
   }, [route.page, route.path, route.slug]);
 
+  // 公开页浏览器标题跟随当前题库名称，离开公开题库页时恢复站点默认标题。
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+    const previousTitle = document.title || SITE_TITLE;
+    const bankTitle = quiz?.question_bank.name.trim();
+    if ((route.page === "quiz" || route.page === "leaderboard") && bankTitle) {
+      document.title = bankTitle;
+    } else if (route.page === "home") {
+      document.title = SITE_TITLE;
+    }
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [quiz?.question_bank.name, route.page]);
+
   // 计时器 interval
   useEffect(() => {
     if (startedAt === null || timerStopped) {
@@ -261,9 +288,9 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
     setTimerStopped(true);
   }
 
-  /** 处理学生信息输入 */
-  function updateStudentForm(fieldName: keyof StudentForm, value: string) {
-    setStudentForm((currentForm) => ({
+  /** 处理弹窗内学生信息草稿输入，正式提交前不影响成绩提交载荷。 */
+  function updateStudentDraft(fieldName: keyof StudentForm, value: string) {
+    setStudentDraft((currentForm) => ({
       ...currentForm,
       [fieldName]: value.slice(0, FIELD_LIMITS[fieldName]),
     }));
@@ -272,26 +299,68 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
     }
   }
 
+  /** 保存或清理题库内记住的学生信息，浏览器存储失败时只提示，不阻断答题。 */
+  function persistStudentProfile(form: StudentForm, shouldRemember: boolean) {
+    if (shouldRemember) {
+      const isSaved = saveRememberedStudentProfile(slug, form);
+      if (!isSaved) {
+        toast.error("浏览器无法记住学生信息，本次仍可继续答题");
+      }
+      return;
+    }
+    removeRememberedStudentProfile(slug);
+  }
+
   /** 确认入场身份信息 */
   function confirmStudentIdentity() {
-    const validationMessage = validateStudentForm(studentForm);
+    const validationMessage = validateStudentForm(studentDraft);
     if (validationMessage) {
       setIdentityError(validationMessage);
       return;
     }
-    const normalizedForm = normalizeStudentForm(studentForm);
+    const normalizedForm = normalizeStudentForm(studentDraft);
     setStudentForm(normalizedForm);
-    if (rememberStudent) {
-      const isSaved = saveRememberedStudentProfile(slug, normalizedForm);
-      if (!isSaved) {
-        toast.error("浏览器无法记住学生信息，本次仍可继续答题");
-      }
-    } else {
-      removeRememberedStudentProfile(slug);
-    }
+    setStudentDraft(normalizedForm);
+    setRememberStudent(rememberDraft);
+    persistStudentProfile(normalizedForm, rememberDraft);
     setIdentityError("");
     setIsIdentityConfirmed(true);
     showStatus("身份信息已确认，点击卡片开始计时");
+  }
+
+  /** 打开右上角用户信息编辑弹窗。 */
+  function openStudentEditor() {
+    setStudentDraft(studentForm);
+    setRememberDraft(rememberStudent);
+    setIdentityError("");
+    setIsStudentEditorOpen(true);
+  }
+
+  /** 关闭编辑弹窗时丢弃未保存草稿，避免用户误以为已经保存。 */
+  function changeStudentEditorOpen(open: boolean) {
+    setIsStudentEditorOpen(open);
+    if (!open) {
+      setStudentDraft(studentForm);
+      setRememberDraft(rememberStudent);
+      setIdentityError("");
+    }
+  }
+
+  /** 保存右上角用户信息弹窗中的修改。 */
+  function saveStudentProfile() {
+    const validationMessage = validateStudentForm(studentDraft);
+    if (validationMessage) {
+      setIdentityError(validationMessage);
+      return;
+    }
+    const normalizedForm = normalizeStudentForm(studentDraft);
+    setStudentForm(normalizedForm);
+    setStudentDraft(normalizedForm);
+    setRememberStudent(rememberDraft);
+    persistStudentProfile(normalizedForm, rememberDraft);
+    setIdentityError("");
+    setIsStudentEditorOpen(false);
+    toast.success("用户信息已保存");
   }
 
   /** 重置当前测验状态并重新洗牌 */
@@ -410,9 +479,8 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
         isLoading={isLeaderboardLoading || isLoading}
         publicError={publicError}
         quiz={quiz}
-        siteTitle={SITE_TITLE}
         styleClass={styleClass}
-        onNavigateHome={() => navigateTo(`/b/${encodeURIComponent(slug)}`)}
+        onNavigateHome={() => navigateTo(buildPublicQuizPath(slug))}
       />
     );
   }
@@ -437,23 +505,35 @@ export function PublicApp({ route, navigateTo }: PublicAppProps) {
         styleClass={styleClass}
         totalPairs={totalPairs}
         onCardClick={handleCardClick}
-        onNavigateLeaderboard={() => navigateTo(`/b/${encodeURIComponent(slug)}/leaderboard`)}
+        onNavigateLeaderboard={() => navigateTo(buildPublicLeaderboardPath(slug))}
+        onOpenStudentEditor={openStudentEditor}
         onResetGame={resetGame}
-        onStudentFormChange={updateStudentForm}
         onSubmitScore={handleSubmitScore}
       />
       {shouldShowIdentityModal && (
         <StudentIdentityModal
           open={shouldShowIdentityModal}
           errorMessage={identityError}
-          form={studentForm}
-          rememberStudent={rememberStudent}
+          form={studentDraft}
+          rememberStudent={rememberDraft}
           styleClass={styleClass}
           onConfirm={confirmStudentIdentity}
-          onFormChange={updateStudentForm}
-          onRememberChange={setRememberStudent}
+          onFormChange={updateStudentDraft}
+          onRememberChange={setRememberDraft}
         />
       )}
+      <StudentIdentityModal
+        open={isStudentEditorOpen}
+        errorMessage={identityError}
+        form={studentDraft}
+        mode="edit"
+        rememberStudent={rememberDraft}
+        styleClass={styleClass}
+        onConfirm={saveStudentProfile}
+        onFormChange={updateStudentDraft}
+        onOpenChange={changeStudentEditorOpen}
+        onRememberChange={setRememberDraft}
+      />
     </>
   );
 }

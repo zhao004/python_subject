@@ -17,6 +17,7 @@ from app.config import (
     MAX_SLUG_LENGTH,
     MIN_QUESTION_ITEM_COUNT,
     MIN_SLUG_LENGTH,
+    RESERVED_PUBLIC_SLUGS,
     SUPPORTED_SUBMISSION_STYLES,
 )
 
@@ -87,6 +88,8 @@ class QuestionBankPayload(TrimmedModel):
 
         if not SLUG_PATTERN.fullmatch(slug):
             raise ValueError("题库链接只能包含字母、数字、下划线和连字符，长度 3-32 位")
+        if slug.lower() in RESERVED_PUBLIC_SLUGS:
+            raise ValueError("题库链接不能使用系统保留路径")
         return slug
 
     @field_validator("submission_style")

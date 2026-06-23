@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { UserRound } from "lucide-react";
 import { formatElapsedTime } from "../utils";
 import type { BoardItem, QuizData, ScoreSubmissionResult, StudentForm } from "../types";
-import { LoadingPage, ResultPanel, StatusCard, StudentFields } from "./Common";
+import { LoadingPage, ResultPanel, StatusCard } from "./Common";
 import { MatchCard } from "./MatchCard";
 
 interface QuizPageProps {
@@ -23,9 +24,9 @@ interface QuizPageProps {
   isSubmitting: boolean;
   styleClass: string;
   onCardClick: (item: BoardItem) => void;
+  onOpenStudentEditor: () => void;
   onResetGame: () => void;
   onSubmitScore: () => void;
-  onStudentFormChange: (fieldName: keyof StudentForm, value: string) => void;
   onNavigateLeaderboard: () => void;
 }
 
@@ -33,11 +34,9 @@ interface QuizPageProps {
  * 答题页面展示层。
  *
  * 结构：
- * - hero 渐变标题区（题库名 + 站点标题 + 描述 + 学生信息表单）
+ * - hero 渐变标题区（题库名 + 描述 + 用户信息入口）
  * - 状态栏（配对数 / 得分 / 用时 / 操作提示）
  * - 配对区（左列表 + 右列表 + 操作按钮 + 结果面板）
- *
- * 桌面端 hero 为双列布局（标题 + 表单），移动端单列。
  */
 export function QuizPage({
   quiz,
@@ -57,9 +56,9 @@ export function QuizPage({
   isSubmitting,
   styleClass,
   onCardClick,
+  onOpenStudentEditor,
   onResetGame,
   onSubmitScore,
-  onStudentFormChange,
   onNavigateLeaderboard,
 }: QuizPageProps) {
   if (isLoading) {
@@ -79,7 +78,7 @@ export function QuizPage({
     >
       <section className="grid w-full">
         {/* hero 标题区 */}
-        <header className="hero-gradient grid gap-4 rounded-t-lg p-4 text-brand-surface shadow-soft sm:grid-cols-[minmax(20rem,1fr)_minmax(32rem,38rem)] sm:items-end sm:p-5">
+        <header className="hero-gradient relative grid gap-4 rounded-t-lg p-4 pr-16 text-brand-surface shadow-soft sm:p-5 sm:pr-20">
           <div className="grid max-w-46rem gap-2">
             <h1 className="font-serif text-4xl sm:text-[2.25rem] lg:text-[2.55rem]">
               {quiz.question_bank.name}
@@ -90,18 +89,27 @@ export function QuizPage({
               </p>
             )}
           </div>
-          <div
-            aria-label="学生信息"
-            className="grid gap-3 sm:grid-cols-3"
+          <Button
+            type="button"
+            variant="publicSecondary"
+            size="icon"
+            className="absolute right-4 top-4 rounded-full border-white/30 bg-[rgba(var(--surface-rgb),0.96)] text-brand hover:bg-brand-surface-warm focus-visible:ring-brand-accent sm:right-5 sm:top-5"
+            onClick={onOpenStudentEditor}
+            aria-label={
+              studentForm.studentName
+                ? `编辑用户信息，当前用户 ${studentForm.studentName}`
+                : "编辑用户信息"
+            }
+            title="用户信息"
           >
-            <StudentFields form={studentForm} onChange={onStudentFormChange} variant="on-dark" />
-          </div>
+            <UserRound className="h-5 w-5" aria-hidden="true" />
+          </Button>
         </header>
 
         {/* 状态栏 */}
         <section
           aria-label="测验状态"
-          className="grid grid-cols-2 gap-2.5 border-x border-brand-line bg-[rgba(var(--surface-rgb),0.86)] p-3.5 sm:grid-cols-3 sm:gap-3.5 sm:p-4"
+          className="grid grid-cols-3 gap-1.5 border-x border-brand-line bg-[rgba(var(--surface-rgb),0.86)] p-2.5 sm:gap-3.5 sm:p-4"
         >
           <StatusCard label="配对" value={`${matchedCount}/${totalPairs}`} />
           <StatusCard label="得分" value={`${score}/100`} />

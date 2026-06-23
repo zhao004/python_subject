@@ -10,7 +10,7 @@ import string
 from sqlalchemy import Select, delete, desc, func, select, update
 from sqlalchemy.orm import Session, selectinload
 
-from app.config import MAX_LEADERBOARD_LIMIT, MAX_SCORE
+from app.config import MAX_LEADERBOARD_LIMIT, MAX_SCORE, RESERVED_PUBLIC_SLUGS
 from app.models import AccessLog, QuestionBank, QuestionItem, ScoreRecord, SiteSetting, SubmissionLog
 from app.schemas import (
     AccessLogInput,
@@ -62,8 +62,8 @@ UNKNOWN_REGION = "未知"
 UNKNOWN_DEVICE = "未知设备"
 FALLBACK_IP = "0.0.0.0"
 SITE_SETTING_ID = 1
-# 随机短码字符集：大小写字母 + 数字，剔除易混淆字符
-SLUG_ALPHABET = string.ascii_letters + string.digits
+# 随机短码字符集：纯字母 6 位，避免与系统根路径和数字资源路径冲突。
+SLUG_ALPHABET = string.ascii_letters
 SLUG_RANDOM_LENGTH = 6
 SLUG_RANDOM_MAX_ATTEMPTS = 10
 TREND_WINDOW_DAYS = 7
@@ -245,13 +245,15 @@ def assert_slug_available(session: Session, slug: str, *, current_bank_id: int |
 
 
 def generate_unique_random_slug(session: Session) -> str:
-    """生成 6 位大小写字母数字随机短码并确保库内唯一。
+    """生成 6 位大小写字母随机短码并确保库内唯一。
 
     冲突时重试最多 10 次，仍失败则抛业务冲突。
     """
 
     for _ in range(SLUG_RANDOM_MAX_ATTEMPTS):
         candidate = "".join(secrets.choice(SLUG_ALPHABET) for _ in range(SLUG_RANDOM_LENGTH))
+        if candidate.lower() in RESERVED_PUBLIC_SLUGS:
+            continue
         collision = session.scalar(select(QuestionBank).where(QuestionBank.slug == candidate))
         if collision is None:
             return candidate

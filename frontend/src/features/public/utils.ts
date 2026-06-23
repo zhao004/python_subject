@@ -5,6 +5,12 @@ import {
   STUDENT_ID_LENGTH,
   STUDENT_ID_PATTERN,
 } from "./constants";
+import {
+  LEGACY_PUBLIC_BANK_SEGMENT,
+  PUBLIC_LEADERBOARD_SEGMENT,
+  isReservedPublicRootSegment,
+  isValidPublicSlugSegment,
+} from "./links";
 import type { BoardItem, RouteInfo, StudentForm, WordPair } from "./types";
 
 /**
@@ -12,8 +18,10 @@ import type { BoardItem, RouteInfo, StudentForm, WordPair } from "./types";
  *
  * 路由约定：
  * - /admin→后台
- * - /b/:slug→答题页
- * - /b/:slug/leaderboard→排行榜页
+ * - /:slug→答题页
+ * - /:slug/leaderboard→排行榜页
+ * - /b/:slug→旧版答题链接，仅用于兼容已复制出去的地址
+ * - /b/:slug/leaderboard→旧版排行榜链接，仅用于兼容已复制出去的地址
  * - 其余→首页
  *
  * @param pathname 浏览器路径，默认取 window.location.pathname。
@@ -24,21 +32,47 @@ export function readRoute(pathname: string = window.location.pathname): RouteInf
   if (path.startsWith("/admin")) {
     return { page: "admin", path };
   }
-  const publicMatch = path.match(/^\/b\/([^/]+)(?:\/(leaderboard))?$/);
-  if (publicMatch) {
-    let slug = "";
-    try {
-      slug = decodeURIComponent(publicMatch[1]);
-    } catch {
-      return { page: "home", path };
-    }
+  const legacyPattern = new RegExp(
+    `^/${LEGACY_PUBLIC_BANK_SEGMENT}/([^/]+)(?:/(${PUBLIC_LEADERBOARD_SEGMENT}))?$`,
+  );
+  const legacyMatch = path.match(legacyPattern);
+  if (legacyMatch) {
+    return buildRouteFromSlugMatch(path, legacyMatch[1], legacyMatch[2]);
+  }
+  const publicMatch = path.match(/^\/([^/]+)(?:\/([^/]+))?$/);
+  if (
+    publicMatch &&
+    publicMatch[2] !== undefined &&
+    publicMatch[2] !== PUBLIC_LEADERBOARD_SEGMENT
+  ) {
+    return { page: "home", path };
+  }
+  if (
+    publicMatch &&
+    isValidPublicSlugSegment(publicMatch[1]) &&
+    !isReservedPublicRootSegment(publicMatch[1])
+  ) {
+    return buildRouteFromSlugMatch(path, publicMatch[1], publicMatch[2]);
+  }
+  return { page: "home", path };
+}
+
+/** 从路由正则匹配结果中安全解码 slug，解码失败时回退首页。 */
+function buildRouteFromSlugMatch(
+  path: string,
+  encodedSlug: string,
+  segment?: string,
+): RouteInfo {
+  try {
+    const slug = decodeURIComponent(encodedSlug);
     return {
-      page: publicMatch[2] === "leaderboard" ? "leaderboard" : "quiz",
+      page: segment === PUBLIC_LEADERBOARD_SEGMENT ? "leaderboard" : "quiz",
       slug,
       path,
     };
+  } catch {
+    return { page: "home", path };
   }
-  return { page: "home", path };
 }
 
 /**

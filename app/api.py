@@ -340,7 +340,7 @@ def delete_admin_question_bank(bank_id: int, _: AdminDep, session: SessionDep) -
 def generate_admin_slug(_: AdminDep, session: SessionDep) -> dict[str, str]:
     """生成题库专属访问链接后缀。
 
-    返回 6 位大小写字母数字随机串，前端默认填入新建表单 slug 字段。
+    返回 6 位大小写字母随机串，前端默认填入新建表单 slug 字段。
     """
 
     try:

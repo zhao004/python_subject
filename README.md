@@ -62,13 +62,13 @@ cd ..
 uvicorn main:app --reload
 ```
 
-构建产物会输出到 `static/`。FastAPI 会托管 React 页面，并在主域名已配置默认题库时跳转到 `/b/{slug}`。
+构建产物会输出到 `static/`。FastAPI 会托管 React 页面，并在主域名已配置默认题库时跳转到 `/{slug}`。
 
 ## 使用入口
 
 - 后台管理：`/admin`
-- 题库公开链接：`/b/{slug}`
-- 题库排行榜：`/b/{slug}/leaderboard`
+- 题库公开链接：`/{slug}`
+- 题库排行榜：`/{slug}/leaderboard`
 
 首次部署后先进入后台创建题库，并设置默认题库。题库支持独立链接、启停、排行榜显示名额和内置提交页样式。
 

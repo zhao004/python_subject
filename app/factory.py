@@ -100,7 +100,7 @@ def create_app(database_url: str | None = None, static_dir: str | Path | None = 
             except SQLAlchemyError:
                 default_bank = None
             if default_bank is not None:
-                return RedirectResponse(url=f"/b/{default_bank.slug}", status_code=307)
+                return RedirectResponse(url=f"/{default_bank.slug}", status_code=307)
 
             return FileResponse(index_file)
 

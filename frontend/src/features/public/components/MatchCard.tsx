@@ -8,7 +8,7 @@ import type { BoardItem } from "../types";
  * 状态说明：
  * - left：左侧卡片，左 border 强调色，暖色背景，粗体
  * - right：右侧卡片，右 border 品牌色，冷色背景，中等粗体
- * - selected：选中态，蓝色边框 + inset 阴影 + 浅蓝背景
+ * - selected：选中态，使用当前主题强调色和浅色背景
  * - matched：已配对态，删除线 + 灰化 + 无阴影
  */
 const matchCardVariants = cva(

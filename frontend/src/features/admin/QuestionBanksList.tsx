@@ -59,21 +59,9 @@ import {
 } from "./api";
 import type { QuestionBank, QuestionBankPayload } from "./types";
 import QuestionBankDialog from "./QuestionBankDialog";
+import { buildPublicQuizUrl } from "@/features/public/links";
 
 const PAGE_SIZE = 25;
-
-/** 构建公开题库完整地址，浏览器环境异常时回退到相对路径。 */
-function buildPublicBankUrl(slug: string): string {
-  const safeSlug = slug.trim();
-  if (!safeSlug) {
-    return "/b/";
-  }
-  const path = `/b/${encodeURIComponent(safeSlug)}`;
-  if (typeof window === "undefined" || !window.location?.origin) {
-    return path;
-  }
-  return new URL(path, window.location.origin).toString();
-}
 
 /** 复制文本到剪贴板，Clipboard API 不可用时使用隐藏文本域回退。 */
 async function copyTextToClipboard(text: string): Promise<void> {
@@ -374,7 +362,7 @@ export default function QuestionBanksList() {
                 </TableRow>
               ) : (
                 entries.map((bank) => {
-                  const publicUrl = buildPublicBankUrl(bank.slug);
+                  const publicUrl = buildPublicQuizUrl(bank.slug);
                   return (
                     <TableRow key={bank.id}>
                       <TableCell>

@@ -112,6 +112,23 @@ def test_static_javascript_uses_module_mime_type(tmp_path: Path) -> None:
     assert response.headers["content-type"].startswith("text/javascript")
 
 
+def test_root_redirects_to_default_bank_slug(tmp_path: Path) -> None:
+    """首页在配置默认题库时应跳转到根路径短码。"""
+
+    static_dir = tmp_path / "static"
+    static_dir.mkdir(parents=True)
+    (static_dir / "index.html").write_text("<div id='root'></div>", encoding="utf-8")
+
+    database_url = f"sqlite:///{tmp_path / 'redirect-test.db'}"
+    app = create_app(database_url=database_url, static_dir=static_dir)
+    with TestClient(app) as test_client:
+        seed_default_question_bank(app)
+        response = test_client.get("/", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == f"/{TEST_BANK_SLUG}"
+
+
 def test_read_quiz_returns_word_pairs(client: TestClient) -> None:
     """默认题库测验配置应包含 20 组配对题和计分规则。"""
 
@@ -421,7 +438,7 @@ def test_access_log_records_public_page(client: TestClient, monkeypatch: pytest.
 
     response = client.post(
         "/api/public/access-logs",
-        json={"page_path": f"/b/{TEST_BANK_SLUG}", "question_bank_slug": TEST_BANK_SLUG},
+        json={"page_path": f"/{TEST_BANK_SLUG}", "question_bank_slug": TEST_BANK_SLUG},
         headers={"user-agent": "Mozilla/5.0 iPhone", "x-forwarded-for": "8.8.8.8"},
     )
     assert response.status_code == 204
@@ -434,7 +451,7 @@ def test_access_log_records_public_page(client: TestClient, monkeypatch: pytest.
     body = logs_response.json()
     assert body["total"] >= 1
     log = body["entries"][0]
-    assert log["page_path"] == f"/b/{TEST_BANK_SLUG}"
+    assert log["page_path"] == f"/{TEST_BANK_SLUG}"
     assert log["device"] == "移动设备"
     assert log["ip_address"] == "8.8.8.8"
 
@@ -480,10 +497,33 @@ def test_admin_bank_payload_supports_announcement_and_uppercase_slug(
     assert bank["announcement"] == "重要通知"
 
 
+def test_admin_rejects_reserved_public_slug(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """题库短码不能占用后台、接口或静态资源等系统根路径。"""
+
+    _admin_login(client, monkeypatch)
+    response = client.post(
+        "/api/admin/question-banks",
+        json={
+            "name": "保留路径题库",
+            "slug": "admin",
+            "description": "",
+            "is_active": True,
+            "leaderboard_limit": 5,
+            "submission_style": "classic",
+            "announcement": "",
+            "items": [{"left_text": "alpha", "right_text": "阿尔法"}],
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_random_slug_endpoint_returns_unique_6char_slug(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """后台生成 slug 应返回 6 位字母数字字符且保证唯一。"""
+    """后台生成 slug 应返回 6 位字母字符且保证唯一。"""
 
     import re
 
@@ -492,7 +532,7 @@ def test_random_slug_endpoint_returns_unique_6char_slug(
     assert response.status_code == 200
     slug = response.json()["slug"]
     assert len(slug) == 6
-    assert re.fullmatch(r"[A-Za-z0-9]{6}", slug) is not None
+    assert re.fullmatch(r"[A-Za-z]{6}", slug) is not None
 
     # 第二次生成不应与第一次重复
     second_response = client.post("/api/admin/question-banks/random-slug")
@@ -605,13 +645,13 @@ def test_access_logs_filtered_by_bank_id(
 
     client.post(
         "/api/public/access-logs",
-        json={"page_path": f"/b/{TEST_BANK_SLUG}", "question_bank_slug": TEST_BANK_SLUG},
+        json={"page_path": f"/{TEST_BANK_SLUG}", "question_bank_slug": TEST_BANK_SLUG},
         headers={"user-agent": "Mozilla/5.0", "x-forwarded-for": "1.1.1.1"},
     )
     bank_id = 1
     client.post(
         "/api/public/access-logs",
-        json={"page_path": "/b/other-bank"},
+        json={"page_path": "/other-bank"},
     )
 
     _admin_login(client, monkeypatch)
@@ -705,7 +745,7 @@ def test_access_logs_search_matches_path_or_ip(
 
     client.post(
         "/api/public/access-logs",
-        json={"page_path": "/b/search-test-page", "question_bank_slug": TEST_BANK_SLUG},
+        json={"page_path": "/search-test-page", "question_bank_slug": TEST_BANK_SLUG},
         headers={"user-agent": "Mozilla/5.0", "x-forwarded-for": "9.9.9.9"},
     )
 

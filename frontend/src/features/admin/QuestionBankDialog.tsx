@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { buildPublicQuizUrl } from "@/features/public/links";
 import {
   fetchQuestionBank,
   createQuestionBank,
@@ -253,6 +254,7 @@ export default function QuestionBankDialog({
   };
 
   const slugValue = watch("slug");
+  const previewUrl = slugValue ? buildPublicQuizUrl(slugValue) : "";
   const isSaving = isSubmitting || mutation.isPending;
 
   return (
@@ -340,7 +342,7 @@ export default function QuestionBankDialog({
                 )}
                 {slugValue && (
                   <p className="text-xs text-muted-foreground">
-                    访问地址：/b/{slugValue}
+                    访问地址：{previewUrl}
                   </p>
                 )}
               </div>

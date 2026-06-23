@@ -107,7 +107,7 @@ const config: Config = {
                 soft: "var(--shadow-soft)",
                 card: "0 0.22rem 0.7rem rgba(41, 63, 56, 0.08)",
                 cardHover: "0 0.42rem 0.95rem rgba(41, 63, 56, 0.13)",
-                selected: "inset 0 0 0 0.08rem #2f6edb, 0 0.45rem 1.1rem rgba(47, 110, 219, 0.16)",
+                selected: "inset 0 0 0 0.08rem var(--selected-border), 0 0.45rem 1.1rem rgba(var(--focus-ring-rgb), 0.16)",
                 primary: "0 0.35rem 0 var(--brand-strong)",
                 primaryActive: "0 0.2rem 0 var(--brand-strong)",
                 toast: "0 0.8rem 1.5rem rgba(22, 42, 40, 0.22)",
