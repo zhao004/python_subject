@@ -10,7 +10,15 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trophy, ClipboardList, Pencil, Trash2, ListChecks, ExternalLink } from "lucide-react";
+import {
+  ClipboardList,
+  Copy,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+  Trophy,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -29,7 +38,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -43,11 +51,92 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { fetchQuestionBanks, batchDeleteQuestionBanks } from "./api";
-import type { QuestionBank } from "./types";
+import {
+  batchDeleteQuestionBanks,
+  fetchQuestionBank,
+  fetchQuestionBanks,
+  updateQuestionBank,
+} from "./api";
+import type { QuestionBank, QuestionBankPayload } from "./types";
 import QuestionBankDialog from "./QuestionBankDialog";
 
 const PAGE_SIZE = 25;
+
+/** 构建公开题库完整地址，浏览器环境异常时回退到相对路径。 */
+function buildPublicBankUrl(slug: string): string {
+  const safeSlug = slug.trim();
+  if (!safeSlug) {
+    return "/b/";
+  }
+  const path = `/b/${encodeURIComponent(safeSlug)}`;
+  if (typeof window === "undefined" || !window.location?.origin) {
+    return path;
+  }
+  return new URL(path, window.location.origin).toString();
+}
+
+/** 复制文本到剪贴板，Clipboard API 不可用时使用隐藏文本域回退。 */
+async function copyTextToClipboard(text: string): Promise<void> {
+  const value = text.trim();
+  if (!value) {
+    throw new Error("复制内容为空");
+  }
+
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // 非安全上下文或权限拒绝时，继续尝试旧式复制。
+    }
+  }
+
+  if (
+    typeof document === "undefined" ||
+    typeof document.execCommand !== "function" ||
+    !document.body
+  ) {
+    throw new Error("当前环境不支持自动复制");
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("浏览器拒绝复制");
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
+/** 将完整题库详情转为提交载荷，并允许覆盖启用状态。 */
+function buildQuestionBankPayload(
+  bank: QuestionBank,
+  isActive: boolean,
+): QuestionBankPayload {
+  return {
+    name: bank.name,
+    slug: bank.slug,
+    description: bank.description ?? "",
+    announcement: bank.announcement ?? "",
+    is_active: isActive,
+    leaderboard_limit: bank.leaderboard_limit,
+    submission_style: bank.submission_style,
+    items: (bank.items ?? []).map((item) => ({
+      left_text: item.left_text,
+      right_text: item.right_text,
+    })),
+  };
+}
 
 /** 格式日期时间 */
 function formatDateTime(dateStr: string): string {
@@ -104,6 +193,33 @@ export default function QuestionBanksList() {
     },
   });
 
+  /** 切换题库启用状态。 */
+  const statusMutation = useMutation({
+    mutationFn: async ({
+      bank,
+      nextActive,
+    }: {
+      bank: QuestionBank;
+      nextActive: boolean;
+    }) => {
+      const latestBank = await fetchQuestionBank(bank.id);
+      const payload = buildQuestionBankPayload(latestBank, nextActive);
+      return updateQuestionBank(bank.id, payload);
+    },
+    onSuccess: (updatedBank) => {
+      queryClient.setQueryData(["admin-question-bank", updatedBank.id], updatedBank);
+      queryClient.invalidateQueries({ queryKey: ["admin-question-bank", updatedBank.id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-question-banks"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-banks-for-filter"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-banks-for-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      toast.success(updatedBank.is_active ? "题库已启用" : "题库已停用");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "状态更新失败");
+    },
+  });
+
   /** 打开新建弹窗 */
   const openCreateDialog = () => {
     setEditingBankId(null);
@@ -142,6 +258,22 @@ export default function QuestionBanksList() {
   const confirmBatchDelete = () => {
     if (selectedIds.size === 0) return;
     batchDeleteMutation.mutate(Array.from(selectedIds));
+  };
+
+  /** 复制题库公开地址。 */
+  const handleCopyAddress = async (address: string) => {
+    try {
+      await copyTextToClipboard(address);
+      toast.success("题库地址已复制");
+    } catch (err) {
+      toast.error((err as Error).message || "复制失败，请手动复制链接");
+    }
+  };
+
+  /** 切换题库状态。 */
+  const handleToggleStatus = (bank: QuestionBank, nextActive: boolean) => {
+    if (statusMutation.isPending) return;
+    statusMutation.mutate({ bank, nextActive });
   };
 
   return (
@@ -215,9 +347,9 @@ export default function QuestionBanksList() {
                     aria-label="全选"
                   />
                 </TableHead>
+                <TableHead className="text-center">状态</TableHead>
                 <TableHead>名称</TableHead>
-                <TableHead>标识</TableHead>
-                <TableHead>状态</TableHead>
+                <TableHead className="w-[24rem]">题库地址</TableHead>
                 <TableHead className="text-right">题目数</TableHead>
                 <TableHead>创建时间</TableHead>
                 <TableHead className="text-right">操作</TableHead>
@@ -241,77 +373,101 @@ export default function QuestionBanksList() {
                   </TableCell>
                 </TableRow>
               ) : (
-                entries.map((bank) => (
-                  <TableRow key={bank.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(bank.id)}
-                        onCheckedChange={() => toggleSelect(bank.id)}
-                        aria-label={`选择 ${bank.name}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <button
-                        type="button"
-                        onClick={() => openEditDialog(bank)}
-                        className="text-left text-primary hover:underline"
-                      >
-                        {bank.name}
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{bank.slug}</TableCell>
-                    <TableCell>
-                      <Badge variant={bank.is_active ? "success" : "secondary"}>
-                        {bank.is_active ? "启用" : "停用"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{bank.item_count}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDateTime(bank.created_at)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                entries.map((bank) => {
+                  const publicUrl = buildPublicBankUrl(bank.slug);
+                  return (
+                    <TableRow key={bank.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(bank.id)}
+                          onCheckedChange={() => toggleSelect(bank.id)}
+                          aria-label={`选择 ${bank.name}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center">
+                          <Switch
+                            checked={bank.is_active}
+                            onCheckedChange={(nextActive) =>
+                              handleToggleStatus(bank, nextActive)
+                            }
+                            disabled={statusMutation.isPending}
+                            aria-label={bank.is_active ? `停用 ${bank.name}` : `启用 ${bank.name}`}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
                           onClick={() => openEditDialog(bank)}
-                          aria-label="编辑"
+                          className="text-left text-primary hover:underline"
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
+                          {bank.name}
+                        </button>
+                      </TableCell>
+                      <TableCell className="max-w-[24rem]">
+                        <div className="flex min-w-0 items-center gap-2">
                           <a
-                            href={`/b/${bank.slug}`}
+                            href={publicUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label="新窗口打开题库"
+                            title={publicUrl}
+                            aria-label={`新窗口打开题库地址 ${publicUrl}`}
+                            className="min-w-0 flex-1 truncate text-primary underline-offset-4 hover:underline"
                           >
-                            <ExternalLink className="mr-1 h-4 w-4" />
-                            跳转
+                            {publicUrl}
                           </a>
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link to={`/admin/question-banks/${bank.id}/items`}>
-                            <ListChecks className="mr-1 h-4 w-4" />
-                            题目
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link to={`/admin/question-banks/${bank.id}/leaderboard`}>
-                            <Trophy className="mr-1 h-4 w-4" />
-                            排行榜
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link to={`/admin/question-banks/${bank.id}/logs`}>
-                            <ClipboardList className="mr-1 h-4 w-4" />
-                            日志
-                          </Link>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            onClick={() => handleCopyAddress(publicUrl)}
+                            aria-label="复制题库地址"
+                            title="复制题库地址"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">{bank.item_count}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDateTime(bank.created_at)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(bank)}
+                            aria-label="编辑"
+                          >
+                            <Pencil className="mr-1 h-4 w-4" />
+                            编辑
+                          </Button>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link to={`/admin/question-banks/${bank.id}/items`}>
+                              <ListChecks className="mr-1 h-4 w-4" />
+                              题目
+                            </Link>
+                          </Button>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link to={`/admin/question-banks/${bank.id}/leaderboard`}>
+                              <Trophy className="mr-1 h-4 w-4" />
+                              排行榜
+                            </Link>
+                          </Button>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link to={`/admin/question-banks/${bank.id}/logs`}>
+                              <ClipboardList className="mr-1 h-4 w-4" />
+                              日志
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

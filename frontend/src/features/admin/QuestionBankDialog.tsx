@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -283,6 +283,28 @@ export default function QuestionBankDialog({
             })}
             className="space-y-6"
           >
+            <div className="rounded-lg border bg-muted/30 px-4 py-3">
+              <Controller
+                control={control}
+                name="is_active"
+                render={({ field }) => (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">启用此题库</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {field.value ? "当前已启用" : "当前已停用"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      aria-label="启用此题库"
+                    />
+                  </div>
+                )}
+              />
+            </div>
+
             {/* 基本信息 */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">基本信息</h3>
@@ -405,22 +427,6 @@ export default function QuestionBankDialog({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Controller
-                  control={control}
-                  name="is_active"
-                  render={({ field }) => (
-                    <Checkbox
-                      id="is_active"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  )}
-                />
-                <Label htmlFor="is_active" className="cursor-pointer text-sm font-normal">
-                  启用此题库
-                </Label>
-              </div>
             </div>
 
             <DialogFooter className="gap-2">
