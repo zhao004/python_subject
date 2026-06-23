@@ -101,6 +101,14 @@ export interface IpBlacklistPayload {
   reason?: string;
 }
 
+/** IP 详情 */
+export interface IpDetails {
+  ip_address: string;
+  region: string;
+  network: string;
+  is_blacklisted: boolean;
+}
+
 /** 访问日志 */
 export interface AccessLog {
   id: number;

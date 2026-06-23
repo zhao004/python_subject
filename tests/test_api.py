@@ -944,6 +944,36 @@ def test_ip_blacklist_list_supports_search(
     assert body["entries"][0]["ip_address"] == "9.9.9.9"
 
 
+def test_admin_ip_details_returns_region_network_and_blacklist_state(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """后台 IP 详情应返回归属地、网络类型和黑名单状态。"""
+
+    _admin_login(client, monkeypatch)
+    response = client.get("/api/admin/ip-details/8.8.8.8")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ip_address"] == "8.8.8.8"
+    assert body["region"] == "未知"
+    assert body["network"] == "公网地址"
+    assert body["is_blacklisted"] is False
+
+    client.post("/api/admin/ip-blacklist", json={"ip_address": "8.8.8.8", "reason": "详情测试"})
+    blocked_response = client.get("/api/admin/ip-details/8.8.8.8")
+    assert blocked_response.status_code == 200
+    assert blocked_response.json()["is_blacklisted"] is True
+
+
+def test_admin_ip_details_rejects_invalid_ip(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """后台 IP 详情应拒绝非法 IP。"""
+
+    _admin_login(client, monkeypatch)
+    response = client.get("/api/admin/ip-details/not-an-ip")
+    assert response.status_code == 400
+
+
 def test_batch_delete_leaderboard_records(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """排行榜记录批量删除应只删除已选 ID，并返回实际删除数量。"""
 

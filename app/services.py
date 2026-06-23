@@ -21,6 +21,7 @@ from app.schemas import (
     AdminLeaderboardRecordPayload,
     AdminOverviewStats,
     DefaultQuestionBankResponse,
+    IpDetailsResponse,
     IpBlacklistItem,
     IpBlacklistListResponse,
     IpBlacklistPayload,
@@ -987,6 +988,49 @@ def is_ip_blocked(session: Session, raw_ip: str | None) -> bool:
     if ip_address == FALLBACK_IP:
         return False
     return session.scalar(select(IpBlacklist.id).where(IpBlacklist.ip_address == ip_address)) is not None
+
+
+def describe_ip_network(raw_ip: str | None) -> str:
+    """描述 IP 网络类型，用于后台判断访问来源性质。"""
+
+    ip_address = normalize_ip_address(raw_ip)
+    if ip_address == FALLBACK_IP:
+        return "未知网络"
+    parsed_ip = ipaddress.ip_address(ip_address)
+    if parsed_ip.version == 6 and parsed_ip.ipv4_mapped is not None:
+        return "IPv4 映射 IPv6"
+    if parsed_ip.is_loopback:
+        return "环回地址"
+    if parsed_ip.is_private:
+        return "私有网络"
+    if parsed_ip.is_link_local:
+        return "链路本地"
+    if parsed_ip.is_multicast:
+        return "组播网络"
+    if parsed_ip.is_reserved:
+        return "保留地址"
+    if parsed_ip.is_unspecified:
+        return "未指定地址"
+    return "公网地址"
+
+
+def build_ip_details(
+    session: Session,
+    raw_ip: str,
+    *,
+    region: str | None,
+) -> IpDetailsResponse:
+    """构建后台 IP 详情，非法 IP 交由调用方返回业务校验错误。"""
+
+    ip_address = normalize_ip_address(raw_ip)
+    if ip_address == FALLBACK_IP:
+        raise ServiceValidationError("IP 地址格式不正确")
+    return IpDetailsResponse(
+        ip_address=ip_address,
+        region=region or UNKNOWN_REGION,
+        network=describe_ip_network(ip_address),
+        is_blacklisted=is_ip_blocked(session, ip_address),
+    )
 
 
 def build_ip_blacklist_item(entry: IpBlacklist) -> IpBlacklistItem:

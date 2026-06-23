@@ -15,6 +15,7 @@ import type {
   SubmissionLog,
   IpBlacklistEntry,
   IpBlacklistPayload,
+  IpDetails,
   AccessLog,
   SiteSettings,
   AdminOverviewStats,
@@ -194,6 +195,12 @@ export async function createIpBlacklistEntry(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function fetchIpDetails(ipAddress: string): Promise<IpDetails> {
+  return httpClient(
+    apiUrl(`${ADMIN_API}/ip-details/${encodeURIComponent(ipAddress)}`),
+  );
 }
 
 export async function deleteIpBlacklistEntry(id: number | string): Promise<void> {

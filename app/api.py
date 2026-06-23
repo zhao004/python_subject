@@ -27,6 +27,7 @@ from app.schemas import (
     AdminOverviewStats,
     AdminSessionResponse,
     DefaultQuestionBankResponse,
+    IpDetailsResponse,
     IpBlacklistItem,
     IpBlacklistListResponse,
     IpBlacklistPayload,
@@ -53,6 +54,7 @@ from app.services import (
     batch_delete_score_records,
     batch_delete_submission_logs,
     build_leaderboard_response,
+    build_ip_details,
     build_question_bank_detail,
     build_quiz_response,
     build_score_response,
@@ -643,6 +645,21 @@ def read_admin_ip_blacklist(
         return list_ip_blacklist_entries(session, limit=limit, offset=offset, search=search)
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="IP 黑名单读取失败") from exc
+
+
+@router.get("/admin/ip-details/{ip_address}", response_model=IpDetailsResponse)
+def read_admin_ip_details(ip_address: str, _: AdminDep, request: Request, session: SessionDep) -> IpDetailsResponse:
+    """后台读取 IP 详情，用于提交流水处置弹窗。"""
+
+    resolver = getattr(request.app.state, "ip_region_resolver", None)
+    normalized_ip = normalize_ip_address(ip_address)
+    region = resolver.resolve(normalized_ip) if resolver is not None else None
+    try:
+        return build_ip_details(session, ip_address, region=region)
+    except ValueError as exc:
+        raise_http_from_service_error(exc)
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="IP 详情读取失败") from exc
 
 
 @router.post("/admin/ip-blacklist", response_model=IpBlacklistItem, status_code=201)

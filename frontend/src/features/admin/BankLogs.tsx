@@ -13,6 +13,7 @@ import { ArrowLeft, Trash2, Download, ShieldBan } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -28,6 +29,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -39,7 +49,9 @@ import {
   fetchSubmissionLogs,
   batchDeleteSubmissionLogs,
   createIpBlacklistEntry,
+  fetchIpDetails,
 } from "./api";
+import type { SubmissionLog } from "./types";
 import { exportToExcel, fetchAllPages } from "@/lib/export-excel";
 
 /** 可选每页条数 */
@@ -82,6 +94,8 @@ export default function BankLogs() {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [detailLog, setDetailLog] = useState<SubmissionLog | null>(null);
+  const [blacklistReason, setBlacklistReason] = useState("");
 
   const offset = (page - 1) * pageSize;
 
@@ -100,6 +114,13 @@ export default function BankLogs() {
   const entries = data?.entries ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const detailIp = detailLog?.ip_address ?? "";
+
+  const { data: ipDetails, isLoading: ipDetailsLoading } = useQuery({
+    queryKey: ["admin-ip-details", detailIp],
+    queryFn: () => fetchIpDetails(detailIp),
+    enabled: Boolean(detailLog && canBlacklistIp(detailLog.ip_address, detailLog.is_manual)),
+  });
 
   const batchDeleteMutation = useMutation({
     mutationFn: (ids: number[]) => batchDeleteSubmissionLogs(bankId!, ids),
@@ -112,17 +133,39 @@ export default function BankLogs() {
   });
 
   const blacklistMutation = useMutation({
-    mutationFn: ({ ipAddress, logId }: { ipAddress: string; logId: number }) =>
+    mutationFn: ({ ipAddress, reason }: { ipAddress: string; reason: string }) =>
       createIpBlacklistEntry({
         ip_address: ipAddress,
-        reason: `来自提交流水 #${logId}`,
+        reason,
       }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-ip-blacklist"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-ip-details", variables.ipAddress] });
       toast.success(`已拉黑 IP：${variables.ipAddress}`);
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
+  /** 打开 IP 详情弹窗，默认备注带上流水来源，便于后续追踪 */
+  const openIpDetails = (log: SubmissionLog) => {
+    if (!canBlacklistIp(log.ip_address, log.is_manual)) {
+      return;
+    }
+    setDetailLog(log);
+    setBlacklistReason(`来自提交流水 #${log.id}`);
+  };
+
+  /** 从弹窗提交 IP 黑名单 */
+  const handleBlacklistFromDialog = () => {
+    if (!detailLog || !canBlacklistIp(detailLog.ip_address, detailLog.is_manual)) {
+      toast.error("当前记录没有可拉黑的 IP");
+      return;
+    }
+    blacklistMutation.mutate({
+      ipAddress: detailLog.ip_address,
+      reason: blacklistReason.trim() || `来自提交流水 #${detailLog.id}`,
+    });
+  };
 
   const toggleSelectAll = () => {
     if (selectedIds.size === entries.length) {
@@ -332,7 +375,21 @@ export default function BankLogs() {
                     <TableCell className="text-right">{log.correct_count}</TableCell>
                     <TableCell className="text-right">{log.total_pairs}</TableCell>
                     <TableCell>{formatElapsed(log.elapsed_seconds)}</TableCell>
-                    <TableCell className="font-mono text-xs">{formatLogIp(log.ip_address)}</TableCell>
+                    <TableCell>
+                      {canBlacklistIp(log.ip_address, log.is_manual) ? (
+                        <Button
+                          variant="link"
+                          className="h-auto p-0 font-mono text-xs"
+                          onClick={() => openIpDetails(log)}
+                        >
+                          {formatLogIp(log.ip_address)}
+                        </Button>
+                      ) : (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {formatLogIp(log.ip_address)}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {log.is_manual ? (
                         <Badge variant="secondary">手工</Badge>
@@ -348,12 +405,7 @@ export default function BankLogs() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            blacklistMutation.mutate({
-                              ipAddress: log.ip_address,
-                              logId: log.id,
-                            })
-                          }
+                          onClick={() => openIpDetails(log)}
                           disabled={blacklistMutation.isPending}
                         >
                           <ShieldBan className="mr-1 h-4 w-4" />
@@ -397,6 +449,92 @@ export default function BankLogs() {
           </div>
         </div>
       )}
+
+      <Dialog
+        open={detailLog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailLog(null);
+            setBlacklistReason("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>提交 IP 详情</DialogTitle>
+            <DialogDescription>
+              提交流水 #{detailLog?.id}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-md border bg-muted/30 p-4">
+              {ipDetailsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-5 w-1/2" />
+                  <Skeleton className="h-5 w-1/3" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <DetailRow label="IP 地址" value={ipDetails?.ip_address ?? formatLogIp(detailLog?.ip_address)} mono />
+                  <DetailRow label="归属地" value={ipDetails?.region || "未知"} />
+                  <DetailRow label="IP 网络" value={ipDetails?.network || "未知网络"} />
+                  <DetailRow
+                    label="黑名单"
+                    value={ipDetails?.is_blacklisted ? "已拉黑" : "未拉黑"}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="submission-ip-blacklist-reason">拉黑备注</Label>
+              <Textarea
+                id="submission-ip-blacklist-reason"
+                value={blacklistReason}
+                onChange={(event) => setBlacklistReason(event.target.value)}
+                maxLength={255}
+                placeholder="记录拉黑原因"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailLog(null)}>
+              关闭
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBlacklistFromDialog}
+              disabled={blacklistMutation.isPending || Boolean(ipDetails?.is_blacklisted)}
+            >
+              <ShieldBan className="mr-1 h-4 w-4" />
+              {ipDetails?.is_blacklisted ? "已拉黑" : "一键拉黑 IP"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/** IP 详情弹窗中的键值行 */
+function DetailRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="shrink-0 text-sm font-medium text-muted-foreground">
+        {label}
+      </span>
+      <span className={`text-right text-sm ${mono ? "font-mono text-xs" : ""}`}>
+        {value}
+      </span>
     </div>
   );
 }

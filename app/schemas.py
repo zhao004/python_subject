@@ -418,6 +418,15 @@ class IpBlacklistListResponse(BaseModel):
     entries: list[IpBlacklistItem]
 
 
+class IpDetailsResponse(BaseModel):
+    """IP 详情响应，用于后台安全处置弹窗。"""
+
+    ip_address: str
+    region: str
+    network: str
+    is_blacklisted: bool
+
+
 class QuestionBankListResponse(BaseModel):
     """题库列表响应，包含总数与明细，支持后台分页。"""
 
