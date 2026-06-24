@@ -176,7 +176,7 @@ export default function AccessLogs() {
   return (
     <div className="space-y-4">
       {/* 标题 + 导出 */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <ClipboardList className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">访问日志</h1>
@@ -186,6 +186,7 @@ export default function AccessLogs() {
           size="sm"
           onClick={handleExport}
           disabled={exporting}
+          className="w-full sm:w-auto"
         >
           <Download className="mr-1 h-4 w-4" />
           {exporting ? "导出中..." : "导出 Excel"}
@@ -193,7 +194,7 @@ export default function AccessLogs() {
       </div>
 
       {/* 搜索 + 每页条数 */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Input
           placeholder="搜索路径/IP/地区..."
           value={search}
@@ -201,7 +202,7 @@ export default function AccessLogs() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className="max-w-xs"
+          className="w-full sm:max-w-xs"
         />
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">每页</span>
@@ -230,7 +231,7 @@ export default function AccessLogs() {
 
       {/* 批量操作栏 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between rounded-md border bg-muted/50 px-4 py-2">
+        <div className="flex flex-col gap-2 rounded-md border bg-muted/50 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             已选 {selectedIds.size} 项
           </span>
@@ -248,7 +249,7 @@ export default function AccessLogs() {
       {/* 列表 */}
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[76rem]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">
@@ -326,7 +327,7 @@ export default function AccessLogs() {
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             共 {total} 条，第 {page}/{totalPages} 页
           </span>

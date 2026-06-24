@@ -326,20 +326,27 @@ export default function QuestionItemsPage() {
   return (
     <div className="space-y-4">
       {/* 标题与返回 */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/admin/question-banks")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <ListChecks className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">题目管理</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex w-full min-w-0 items-start gap-3 sm:flex-1">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/admin/question-banks")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-6 w-6 shrink-0 text-primary" />
+              <h1 className="text-2xl font-bold">题目管理</h1>
+            </div>
+            <p className="truncate text-sm text-muted-foreground">
+              题库：{bank.name}（{itemCount} 条有效）
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            题库：{bank.name}（{itemCount} 条有效）
-          </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setBatchAddOpen(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setBatchAddOpen(true)}
+          className="w-full sm:w-auto"
+        >
           <Upload className="mr-1 h-4 w-4" />
           批量添加
         </Button>
@@ -351,7 +358,7 @@ export default function QuestionItemsPage() {
       >
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-lg">题目配对</CardTitle>
               <Button
                 type="button"
@@ -367,7 +374,7 @@ export default function QuestionItemsPage() {
           <CardContent className="p-0">
             {/* 批量操作栏 */}
             {selectedIndices.size > 0 && (
-              <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
+              <div className="flex flex-col gap-2 border-b bg-muted/50 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm text-muted-foreground">
                   已选 {selectedIndices.size} 项
                 </span>
@@ -384,7 +391,7 @@ export default function QuestionItemsPage() {
             )}
 
             {/* 题目表格 */}
-            <Table>
+            <Table className="min-w-[56rem]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
@@ -469,15 +476,16 @@ export default function QuestionItemsPage() {
         </Card>
 
         {/* 操作按钮 */}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
           <Button
             type="button"
             variant="outline"
             onClick={() => navigate("/admin/question-banks")}
+            className="w-full sm:w-auto"
           >
             取消
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
             {isSubmitting ? "保存中..." : "保存题目"}
           </Button>
         </div>

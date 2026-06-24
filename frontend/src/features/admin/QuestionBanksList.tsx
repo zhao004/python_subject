@@ -267,12 +267,12 @@ export default function QuestionBanksList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <BookOpen className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">题库管理</h1>
         </div>
-        <Button onClick={openCreateDialog}>
+        <Button onClick={openCreateDialog} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           新建题库
         </Button>
@@ -309,7 +309,7 @@ export default function QuestionBanksList() {
 
       {/* 批量操作栏 */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between rounded-md border bg-muted/50 px-4 py-2">
+        <div className="flex flex-col gap-2 rounded-md border bg-muted/50 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             已选 {selectedIds.size} 项
           </span>
@@ -327,7 +327,7 @@ export default function QuestionBanksList() {
       {/* 列表表格 */}
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[76rem]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">
@@ -468,7 +468,7 @@ export default function QuestionBanksList() {
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             共 {total} 条，第 {page}/{totalPages} 页
           </span>

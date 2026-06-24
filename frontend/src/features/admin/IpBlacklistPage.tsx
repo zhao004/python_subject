@@ -148,7 +148,11 @@ export default function IpBlacklistPage() {
             />
           </div>
           <div className="flex items-end">
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
+            <Button
+              onClick={handleCreate}
+              disabled={createMutation.isPending}
+              className="w-full lg:w-auto"
+            >
               <Plus className="mr-1 h-4 w-4" />
               {createMutation.isPending ? "添加中..." : "添加"}
             </Button>
@@ -192,7 +196,7 @@ export default function IpBlacklistPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[48rem]">
             <TableHeader>
               <TableRow>
                 <TableHead>IP 地址</TableHead>
@@ -247,7 +251,7 @@ export default function IpBlacklistPage() {
       </Card>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             第 {page}/{totalPages} 页
           </span>

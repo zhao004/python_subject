@@ -197,7 +197,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <LayoutDashboard className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">概览</h1>
@@ -206,7 +206,7 @@ export default function Dashboard() {
           value={bankFilter || "all"}
           onValueChange={(v) => setBankFilter(v === "all" ? "" : v)}
         >
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="全部题库" />
           </SelectTrigger>
           <SelectContent>

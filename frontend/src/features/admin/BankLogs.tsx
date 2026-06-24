@@ -237,19 +237,19 @@ export default function BankLogs() {
   return (
     <div className="space-y-4">
       {/* 标题 + 导出 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link to="/admin/question-banks">
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <ClipboardList className="h-6 w-6 text-primary" />
+              <ClipboardList className="h-6 w-6 shrink-0 text-primary" />
               <h1 className="text-2xl font-bold">提交流水</h1>
             </div>
-            {bank && <p className="text-sm text-muted-foreground">{bank.name}</p>}
+            {bank && <p className="truncate text-sm text-muted-foreground">{bank.name}</p>}
           </div>
         </div>
         <Button
@@ -257,6 +257,7 @@ export default function BankLogs() {
           size="sm"
           onClick={handleExport}
           disabled={exporting}
+          className="w-full sm:w-auto"
         >
           <Download className="mr-1 h-4 w-4" />
           {exporting ? "导出中..." : "导出 Excel"}
@@ -266,7 +267,7 @@ export default function BankLogs() {
       {/* 搜索 + 操作栏 */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         {selectedIds.size > 0 ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="text-sm text-muted-foreground">
               已选 {selectedIds.size} 项
             </span>
@@ -323,7 +324,7 @@ export default function BankLogs() {
       {/* 列表 */}
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[84rem]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
@@ -428,7 +429,7 @@ export default function BankLogs() {
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             第 {page}/{totalPages} 页
           </span>

@@ -287,10 +287,10 @@ export default function BankLeaderboard() {
       </div>
 
       {/* 操作栏 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           {selectedIds.size > 0 ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="text-sm text-muted-foreground">
                 已选 {selectedIds.size} 项
               </span>
@@ -305,7 +305,7 @@ export default function BankLeaderboard() {
               </Button>
             </div>
           ) : (
-            <span className="text-sm text-muted-foreground">共 {total} 条记录</span>
+              <span className="text-sm text-muted-foreground">共 {total} 条记录</span>
           )}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">每页</span>
@@ -331,17 +331,18 @@ export default function BankLeaderboard() {
             <span className="text-sm text-muted-foreground">条</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button
             variant="outline"
             size="sm"
             onClick={handleExport}
             disabled={exporting}
+            className="w-full sm:w-auto"
           >
             <Download className="mr-1 h-4 w-4" />
             {exporting ? "导出中..." : "导出 Excel"}
           </Button>
-          <Button onClick={openCreateDialog}>
+          <Button onClick={openCreateDialog} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             新增记录
           </Button>
@@ -351,7 +352,7 @@ export default function BankLeaderboard() {
       {/* 列表 */}
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[76rem]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
@@ -448,7 +449,7 @@ export default function BankLeaderboard() {
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-muted-foreground">
             第 {page}/{totalPages} 页
           </span>
