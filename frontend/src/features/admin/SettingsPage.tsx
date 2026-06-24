@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Save, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -83,7 +83,10 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">系统设置</h1>
+      <div className="flex items-center gap-2">
+        <Settings className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold">系统设置</h1>
+      </div>
 
       <Card>
         <CardHeader>

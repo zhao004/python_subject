@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Trash2, Eye, Download } from "lucide-react";
+import { Trash2, Eye, Download, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -177,7 +177,10 @@ export default function AccessLogs() {
     <div className="space-y-4">
       {/* 标题 + 导出 */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">访问日志</h1>
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">访问日志</h1>
+        </div>
         <Button
           variant="outline"
           size="sm"

@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  BookOpen,
   ClipboardList,
   Copy,
   ListChecks,
@@ -267,7 +268,10 @@ export default function QuestionBanksList() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">题库管理</h1>
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">题库管理</h1>
+        </div>
         <Button onClick={openCreateDialog}>
           <Plus className="mr-2 h-4 w-4" />
           新建题库

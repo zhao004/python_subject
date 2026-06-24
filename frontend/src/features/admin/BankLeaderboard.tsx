@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Edit, Trash2, Plus, Download } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Plus, Download, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -278,7 +278,10 @@ export default function BankLeaderboard() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">排行榜管理</h1>
+          <div className="flex items-center gap-2">
+            <Trophy className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">排行榜管理</h1>
+          </div>
           {bank && <p className="text-sm text-muted-foreground">{bank.name}</p>}
         </div>
       </div>

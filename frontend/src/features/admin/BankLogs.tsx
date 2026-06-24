@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Download, ShieldBan } from "lucide-react";
+import { ArrowLeft, Trash2, Download, ShieldBan, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -245,7 +245,10 @@ export default function BankLogs() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">提交流水</h1>
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-6 w-6 text-primary" />
+              <h1 className="text-2xl font-bold">提交流水</h1>
+            </div>
             {bank && <p className="text-sm text-muted-foreground">{bank.name}</p>}
           </div>
         </div>
