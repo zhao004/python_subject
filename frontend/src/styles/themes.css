@@ -103,7 +103,7 @@
   --focus-ring-rgb: 90, 110, 70;
 }
 
-/* ==================== 后台 shadcn Token（冷蓝色调） ==================== */
+/* ==================== 后台 shadcn Token（中性暗色调） ==================== */
 :root {
   color-scheme: light;
   --background: 0 0% 100%;
@@ -134,25 +134,25 @@
 
 .dark {
   color-scheme: dark;
-  --background: 220 18% 7%;
-  --foreground: 220 20% 98%;
-  --card: 220 16% 10%;
-  --card-foreground: 220 20% 98%;
-  --popover: 220 16% 10%;
-  --popover-foreground: 220 20% 98%;
-  --primary: 188 88% 53%;
-  --primary-foreground: 220 38% 8%;
-  --secondary: 220 12% 15%;
-  --secondary-foreground: 220 20% 98%;
-  --muted: 220 12% 13%;
-  --muted-foreground: 220 10% 70%;
-  --accent-hsl: 220 12% 15%;
-  --accent-hsl-foreground: 220 20% 98%;
+  --background: 0 0% 9.8%;
+  --foreground: 0 0% 86%;
+  --card: 0 0% 7.1%;
+  --card-foreground: 0 0% 86%;
+  --popover: 0 0% 7.1%;
+  --popover-foreground: 0 0% 86%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 0 0% 7.1%;
+  --secondary-foreground: 0 0% 86%;
+  --muted: 0 0% 6.7%;
+  --muted-foreground: 0 0% 58%;
+  --accent-hsl: 0 0% 7.1%;
+  --accent-hsl-foreground: 0 0% 86%;
   --destructive: 0 72% 45%;
   --destructive-foreground: 0 0% 100%;
-  --border: 220 12% 22%;
-  --input: 220 12% 22%;
-  --ring: 188 88% 53%;
+  --border: 0 0% 7.1%;
+  --input: 0 0% 20%;
+  --ring: 221 83% 53%;
 }
 
 /* 深色模式下 body 背景与文字色覆盖
@@ -161,11 +161,8 @@
  * 注意：ThemeProvider 卸载时会移除 .dark 类，公开端不受影响。 */
 .dark body {
   color: hsl(var(--foreground));
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(180deg, hsl(220 18% 8%) 0%, hsl(220 18% 7%) 52%, hsl(220 22% 5%) 100%);
-  background-size: 1.6rem 1.6rem, 1.6rem 1.6rem, auto;
+  background: hsl(var(--background));
+  background-size: auto;
   background-color: hsl(var(--background));
 }
 
@@ -173,6 +170,8 @@
 @layer base {
   * {
     box-sizing: border-box;
+    /* 设计意图：让无显式颜色的 border 类跟随主题 token，避免暗色模式露出 Tailwind 默认浅色边线。 */
+    border-color: hsl(var(--border));
   }
 
   html {
