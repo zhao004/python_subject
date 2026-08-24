@@ -99,7 +99,7 @@ export default function AdminLayout() {
     return (
         <div
             className={cn(
-                "min-h-screen overflow-x-hidden bg-background lg:grid lg:grid-cols-[var(--admin-sidebar-width)_minmax(0,1fr)] lg:transition-[grid-template-columns] lg:duration-200",
+                "min-h-screen overflow-x-clip bg-background lg:grid lg:grid-cols-[var(--admin-sidebar-width)_minmax(0,1fr)] lg:transition-[grid-template-columns] lg:duration-200",
                 collapsed
                     ? "[--admin-sidebar-width:var(--admin-sidebar-collapsed-width)]"
                     : "[--admin-sidebar-width:var(--admin-sidebar-expanded-width)]",
